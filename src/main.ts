@@ -29,7 +29,8 @@ class PlayScene extends Phaser.Scene {
       g.generateTexture(key, w, h).destroy();
     };
     texture('floor', TILE, TILE, (g) => g.fillStyle(0x2d5a27).fillRect(0, 0, TILE, TILE).fillStyle(0x264d21).fillRect(0, 0, TILE, 1).fillRect(0, 0, 1, TILE));
-    texture('wall', TILE, TILE, (g) => g.fillStyle(0x6b4f2a).fillRect(0, 0, TILE, TILE));
+    // Same 1px seam on the top/left edge as the floor, so wall tiles continue the floor grid.
+    texture('wall', TILE, TILE, (g) => g.fillStyle(0x6b4f2a).fillRect(0, 0, TILE, TILE).fillStyle(0x553e20).fillRect(0, 0, TILE, 1).fillRect(0, 0, 1, TILE));
     texture('player', 14, 14, (g) => g.fillStyle(0xffcc00).fillRect(0, 0, 14, 14));
     texture('dot', 4, 4, (g) => g.fillStyle(0x222222).fillRect(0, 0, 4, 4));
 
