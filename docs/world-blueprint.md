@@ -23,7 +23,7 @@ This is a plan, not a list of things to build now. Each section says what to bui
 |---|---|---|
 | Tile size | **16×16 px** | The pixel-art standard for top-down games, with plenty of free tilesets at this size |
 | Game resolution | **320×240 px** (20×15 tiles) | Already set up. The game scales up to fit the window. |
-| Character sprite | 24×24 frame, the character about 14–16 px wide and 18–22 px tall (see the [art blueprint](art-animation-blueprint.md)) | About one tile wide, and taller than a tile so it overlaps the tile above for a sense of depth |
+| Character sprite | 32×32 frame, the character about 14 px wide and 28–30 px tall (see the [art blueprint](art-animation-blueprint.md)) | Under one tile wide and almost two tall, so it overlaps the tile above for a sense of depth |
 | World units | **Pixels** for positions and physics, **tiles** for map and AI logic | Phaser works in pixels, while pathfinding and placement think in tiles |
 
 Rules:

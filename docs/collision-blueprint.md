@@ -50,7 +50,7 @@ Hurtboxes, hitboxes and sensors may be **circles** where that fits better (round
 
 ### Starting sizes
 
-All sizes are tunable. Sprite frame sizes come from the [art blueprint](art-animation-blueprint.md): characters are drawn on a **24×24 frame** (the character itself about 14–16 px wide and 18–22 px tall), chihuahuas on 16×16 and bulldogs on 24×24. Boxes are measured against the **drawn** character, not the empty frame around it, and bodies sit at the feet, which is also the sprite's origin.
+All sizes are tunable. Sprite frame sizes come from the [art blueprint](art-animation-blueprint.md): characters are drawn on a **32×32 frame** (the character itself about 14 px wide and 28–30 px tall), chihuahuas on 16×16 and bulldogs on 24×24. Boxes are measured against the **drawn** character, not the empty frame around it, and bodies sit at the feet, which is also the sprite's origin.
 
 | Entity | Body (feet) | Hurtbox | Notes |
 |---|---|---|---|

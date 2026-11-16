@@ -11,7 +11,7 @@ It builds on the [world blueprint](world-blueprint.md) (16 px tiles, Tiled tiles
 | Rule | Value | Why |
 |---|---|---|
 | Tile size | 16×16 | Set in the world blueprint |
-| Character frame | **24×24 canvas**, character about 14–16 px wide and 18–22 px tall, **feet at the bottom centre** | A bit taller than a tile gives room for hair, hats and expression, while staying readable at 320×240 |
+| Character frame | **32×32 canvas**, character about 14 px wide and 28–30 px tall (roughly 1:2), **feet at the bottom centre** | Almost two tiles tall: slim, with room for a readable face, hair and long legs, while staying readable on a 240 px tall view |
 | Dogs | Chihuahua 16×16, bulldog and dachshund 24×24, boss 48×48 or larger | Size tells you the threat at a glance |
 | Palette | One shared limited palette, for example a free 32-colour palette from Lospec | Art drawn by different people still looks like one game |
 | Outlines | Dark 1 px outline on characters and dogs, none on ground tiles | Characters stand out from the floor |
@@ -21,7 +21,7 @@ It builds on the [world blueprint](world-blueprint.md) (16 px tiles, Tiled tiles
 
 ### From your photos to sprites
 
-At 24×24 a face is a few pixels, so each person is defined by **2–3 standout features** (hair shape and colour, glasses, beard, a signature hoodie or cap) plus their main clothing colours.
+At 32×32 a face is about 10×7 pixels, so each person is defined by **2–3 standout features** (hair shape and colour, glasses, beard, a signature hoodie or cap) plus their main clothing colours.
 1. For each person, write down those features from the photos.
 2. Draw the **idle-down** frame (facing the camera) for all four first, side by side, and compare. They should be recognisable *and* look like one squad.
 3. Once all four of you are happy with that, draw the other directions and animations.
@@ -30,8 +30,8 @@ At 24×24 a face is a few pixels, so each person is defined by **2–3 standout 
 
 ## 2. Directions and facing
 
-- **4 drawn directions: down, up, side.** "Left" is "side" flipped, so only **3 are drawn**. The research is consistent that 4 directions read fine even with 8-way movement, at half the work of 8.
-- Facing is taken from the movement or aim direction and **snapped to the nearest of the 4**. On exact diagonals, keep the previous facing, so the sprite doesn't flicker between two.
+- **8 directions, 5 drawn: down, down-side, side, up-side, up.** The left-facing three are the right-facing ones flipped. 4 directions would be half the work and still read, but diagonal frames make 8-way keyboard movement look right, so characters get all 8.
+- Facing is taken from the movement or aim direction and **snapped to the nearest of the 8**. With no input, the previous facing stays.
 - The movement code keeps the full direction for aiming, so abilities can still go diagonal. Only the sprite snaps.
 
 ---
@@ -42,14 +42,14 @@ At 24×24 a face is a few pixels, so each person is defined by **2–3 standout 
 
 | Animation | Directions | Frames | Timing | Notes |
 |---|---|---|---|---|
-| `idle` | 3 | 2 | 400–500 ms per frame | A breathing bob |
-| `walk` | 3 | 4 | 120–150 ms per frame | The classic 4-frame cycle |
-| `attack` | 3 | 3–5 | Follows the ability phases | Windup, strike (active) and recovery frames |
+| `idle` | 5 | 2 | 400–500 ms per frame | A breathing bob |
+| `walk` | 5 | 4 | 100–150 ms per frame | The classic 4-frame cycle |
+| `attack` | 5 | 3–5 | Follows the ability phases | Windup, strike (active) and recovery frames |
 | `ability1`, `ability2` | 3, or 1 if direction doesn't matter | 3–6 | Follows the phases | Can reuse `attack` at first |
 | `hurt` | 1–3 | 1–2 | Short | Plus a white flash done in code |
 | `downed` | 1 | 1–2 | (none) | |
 
-That's about **35–50 frames per character**, roughly 160–200 for all four. Draw `idle` and `walk` first. Everything else can fall back to them (section 6).
+That's about **55–80 frames per character**, roughly 220–320 for all four. Draw `idle` and `walk` first. Everything else can fall back to them (section 6).
 
 ### Each dog breed
 
@@ -163,7 +163,7 @@ Any art, font or sound not made by you goes in `CREDITS.md` with its author and 
 ## 9. Build order
 
 1. **With the four placeholder characters:** the animator with fallbacks, generated placeholders (coloured rectangles with initials), origin at the feet, and shadows.
-2. **When the photos come in:** choose the palette, then draw `idle-down` for all four and review together, then `walk` and `idle` in 3 directions, then load them through `load.aseprite`.
+2. **When the photos come in:** choose the palette, then draw `idle-down` for all four and review together, then `walk` and `idle` in 5 directions, then load them through `load.aseprite`.
 3. **With the first dog:** a chihuahua with `run`, `windup` and `attack`, and the hit spark and swap puff effects.
 4. **Later:** terrain sets for water and paths, animated tiles, the bitmap font, portraits, and the `art:export` script.
 
@@ -173,7 +173,7 @@ Any art, font or sound not made by you goes in `CREDITS.md` with its author and 
 
 - [Pixelblog 22: top-down character sprites](https://www.slynyrd.com/blog/2019/10/21/pixelblog-22-top-down-character-sprites) and [Pixelblog 55: top-down character animation (Raymond Schlitter)](https://www.slynyrd.com/blog/2025/3/24/pixelblog-55-top-down-character-animation): 3/4 view, directions, walk cycles
 - [Pixelblog 8: intro to animation](https://slynyrd.com/blog/2018/8/19/pixelblog-8-intro-to-animation): frame timing
-- [How many sprites do different perspectives need (cxong)](https://cxong.github.io/2022/03/how-many-sprites-do-different-perspectives-need) and [sprite allocation for top-down directions (nesdev)](https://nesdev.nes.science/f21/t6703.xhtml): 4 directions are enough for 8-way movement
+- [How many sprites do different perspectives need (cxong)](https://cxong.github.io/2022/03/how-many-sprites-do-different-perspectives-need) and [sprite allocation for top-down directions (nesdev)](https://nesdev.nes.science/f21/t6703.xhtml): 4 directions can be enough for 8-way movement (we chose 8 for the look)
 - [Sprite animation frame counts (sprite-ai)](https://www.sprite-ai.art/blog/sprite-animation-frames): 4-frame walks, 2–4-frame idles, 3–6-frame attacks with windup, strike and recovery, and adjusting timing when frames change
 - [8-direction 6-frame character base (itch.io)](https://brendon-bancer.itch.io/top-down-character-base-8-directions-6-frames-32x32): how fast 8 directions multiply the frame count
 - Phaser 4.2.1 guides bundled at `node_modules/phaser/skills/animations/SKILL.md` and `loading-assets/SKILL.md`: `load.aseprite`, atlases vs sprite sheets, `anims.create`
