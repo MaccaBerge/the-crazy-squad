@@ -1,9 +1,9 @@
 // Checks every map in public/assets/maps against the rules in docs/world-blueprint.md,
 // so a map Phaser can't load (or that breaks our conventions) fails CI instead of the game.
 import { describe, expect, test } from 'vitest';
-import { MAP_LAYERS, TILE, TILESETS } from './constants';
+import { ENTITY_TYPES, MAP_LAYERS, TILE, TILESETS } from './constants';
 
-type TiledLayer = { name: string; type: string; width?: number; height?: number; data?: unknown; encoding?: string; layers?: TiledLayer[]; objects?: { id: number; template?: string }[] };
+type TiledLayer = { name: string; type: string; width?: number; height?: number; data?: unknown; encoding?: string; layers?: TiledLayer[]; objects?: { id: number; type?: string; template?: string }[] };
 type TiledMap = { orientation: string; infinite: boolean; width: number; height: number; tilewidth: number; tileheight: number; layers: TiledLayer[]; tilesets: Record<string, unknown>[] };
 
 const files = import.meta.glob('/public/assets/maps/*.tmj', { eager: true, query: '?raw', import: 'default' }) as Record<string, string>;
@@ -45,5 +45,11 @@ describe.each(Object.entries(files))('%s', (_path, raw) => {
   test('objects have no unresolved templates', () => {
     const objects = map.layers.flatMap((l) => l.objects ?? []);
     for (const o of objects) expect(o.template, `object ${o.id} still uses a template (detach it in Tiled)`).toBeUndefined();
+  });
+
+  test('entities have known classes and there is exactly one PlayerSpawn', () => {
+    const objects = map.layers.find((l) => l.name === 'Entities')?.objects ?? [];
+    for (const o of objects) expect(ENTITY_TYPES, `object ${o.id} has unknown class "${o.type}"`).toContain(o.type);
+    expect(objects.filter((o) => o.type === 'PlayerSpawn').length, 'PlayerSpawn objects').toBe(1);
   });
 });
