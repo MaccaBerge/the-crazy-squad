@@ -1,0 +1,54 @@
+{
+  "frameWidth": 24,
+  "frameHeight": 24,
+  "anims": {
+    "idle-down": {
+      "frames": [
+        0,
+        1
+      ],
+      "frameRate": 2.2
+    },
+    "walk-down": {
+      "frames": [
+        2,
+        3,
+        4,
+        5
+      ],
+      "frameRate": 8
+    },
+    "idle-up": {
+      "frames": [
+        6,
+        7
+      ],
+      "frameRate": 2.2
+    },
+    "walk-up": {
+      "frames": [
+        8,
+        9,
+        10,
+        11
+      ],
+      "frameRate": 8
+    },
+    "idle-side": {
+      "frames": [
+        12,
+        13
+      ],
+      "frameRate": 2.2
+    },
+    "walk-side": {
+      "frames": [
+        14,
+        15,
+        16,
+        17
+      ],
+      "frameRate": 8
+    }
+  }
+}
