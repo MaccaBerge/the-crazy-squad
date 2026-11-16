@@ -153,10 +153,7 @@ For multiple floors, add `floor × 10000` to every band, so everything on floor 
 
 ## 7. Physics bodies (hitboxes)
 
-- **Arcade physics** (already in use). Rectangles and circles are fast and enough for a top-down game.
-- **A character's body covers only the feet**, roughly the lower half of the sprite, not the whole sprite. This is the standard top-down convention: your head can overlap a wall tile above you, which reads as depth, and the gaps you fit through feel generous.
-- Use **collision categories** (`src/world/constants.ts`) so things only test what they need: `PLAYER`, `DOG`, `PLAYER_SHOT`, `DOG_SHOT`, `WALL`, `WATER_BLOCK`… For example, dog shots skip dogs and player shots skip players.
-- Separate **body** (blocks movement), **hurtbox** (can be hit) and **hitbox** (deals damage) when an entity needs them. A sword swing is a short-lived hitbox, not a physics body.
+Covered in full by the [collision blueprint](collision-blueprint.md): feet-only bodies, separate body / hurtbox / hitbox / sensor shapes, the collision matrix, corner assist, soft pushing between actors, the damage pipeline and projectiles.
 
 ---
 
