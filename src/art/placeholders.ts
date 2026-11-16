@@ -14,13 +14,13 @@ const GLYPHS: Record<string, string[]> = {
 const css = (c: number) => `#${c.toString(16).padStart(6, '0')}`;
 
 /** Texture key for a character: the real sprite once it exists, the generated placeholder until then. */
-export const characterTexture = (def: CharacterDef) => `char-${def.id}`;
+export const characterTexture = (def: CharacterDef) => def.sprite ?? `char-${def.id}`;
 
 /** shortcut: generated stand-ins (art blueprint §6), replaced by Aseprite sprites when the art exists. */
 export function makePlaceholderTextures(scene: Phaser.Scene, defs: CharacterDef[]) {
   for (const def of defs) {
-    const key = characterTexture(def);
-    if (scene.textures.exists(key)) continue;
+    const key = `char-${def.id}`;
+    if (def.sprite || scene.textures.exists(key)) continue;
     const tex = scene.textures.createCanvas(key, FRAME, FRAME)!;
     const ctx = tex.getContext();
     // 14×20 body standing on the bottom edge (feet at the bottom centre = sprite origin)

@@ -5,6 +5,8 @@ export type CharacterDef = {
   name: string;
   /** Placeholder look until the real sprite exists (art blueprint §6). */
   placeholder: { initial: 'M' | 'K' | 'C' | 'J'; color: number };
+  /** Sprite sheet in public/assets/sprites, built from art/characters/<sprite>.mjs. Without it the placeholder is used. */
+  sprite?: string;
   /** Feet hitbox in px (collision blueprint §3). */
   body: { w: number; h: number };
   /** Multipliers on the shared movement tuning, so the T panel still tunes everyone at once. */
