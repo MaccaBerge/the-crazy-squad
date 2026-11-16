@@ -9,8 +9,8 @@ const TILE = 16;
 const tuning = { ...defaultMove, cameraLerp: 0.15 };
 
 class PlayScene extends Phaser.Scene {
-  private player!: Phaser.GameObjects.Rectangle & { body: Phaser.Physics.Arcade.Body };
-  private facingMarker!: Phaser.GameObjects.Rectangle;
+  private player!: Phaser.Physics.Arcade.Image & { body: Phaser.Physics.Arcade.Body };
+  private facingMarker!: Phaser.GameObjects.Image;
   private facing = { x: 0, y: 1 };
   private keys!: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key[]>;
 
@@ -21,10 +21,19 @@ class PlayScene extends Phaser.Scene {
   create() {
     this.physics.world.setBounds(0, 0, WORLD_W, WORLD_H);
 
-    // Grid floor so movement and camera motion are visible.
-    const floor = this.add.graphics().lineStyle(1, 0x264d21);
-    for (let x = 0; x <= WORLD_W; x += TILE) floor.lineBetween(x, 0, x, WORLD_H);
-    for (let y = 0; y <= WORLD_H; y += TILE) floor.lineBetween(0, y, WORLD_W, y);
+    // shortcut: placeholder textures until the pixel art exists. They must be textures (not shapes or
+    // graphics) because Phaser 4 only snaps textured objects to whole pixels; shapes stutter against each other.
+    const texture = (key: string, w: number, h: number, draw: (g: Phaser.GameObjects.Graphics) => void) => {
+      const g = this.add.graphics();
+      draw(g);
+      g.generateTexture(key, w, h).destroy();
+    };
+    texture('floor', TILE, TILE, (g) => g.fillStyle(0x2d5a27).fillRect(0, 0, TILE, TILE).fillStyle(0x264d21).fillRect(0, 0, TILE, 1).fillRect(0, 0, 1, TILE));
+    texture('wall', TILE, TILE, (g) => g.fillStyle(0x6b4f2a).fillRect(0, 0, TILE, TILE));
+    texture('player', 14, 14, (g) => g.fillStyle(0xffcc00).fillRect(0, 0, 14, 14));
+    texture('dot', 4, 4, (g) => g.fillStyle(0x222222).fillRect(0, 0, 4, 4));
+
+    this.add.tileSprite(0, 0, WORLD_W, WORLD_H, 'floor').setOrigin(0);
 
     // Test walls: corners and corridors to feel collisions and wall-sliding.
     const walls = this.physics.add.staticGroup();
@@ -32,15 +41,12 @@ class PlayScene extends Phaser.Scene {
       [240, 160, 96, 16], [240, 160, 16, 96], [560, 120, 16, 160], [608, 120, 16, 160],
       [160, 480, 192, 16], [480, 400, 64, 64], [720, 520, 128, 16], [720, 520, 16, 112],
     ];
-    for (const [x, y, w, h] of wallRects) walls.add(this.add.rectangle(x + w / 2, y + h / 2, w, h, 0x6b4f2a));
+    for (const [x, y, w, h] of wallRects) walls.add(this.add.tileSprite(x + w / 2, y + h / 2, w, h, 'wall'));
 
-    // shortcut: coloured square stands in for the player sprite, replace once the pixel art exists
-    const square = this.add.rectangle(WORLD_W / 2, WORLD_H / 2, 14, 14, 0xffcc00);
-    this.physics.add.existing(square);
-    this.player = square as typeof this.player;
-    this.player.body.setCollideWorldBounds(true);
+    this.player = this.physics.add.image(WORLD_W / 2, WORLD_H / 2, 'player') as typeof this.player;
+    this.player.setCollideWorldBounds(true);
     this.physics.add.collider(this.player, walls);
-    this.facingMarker = this.add.rectangle(0, 0, 4, 4, 0x222222);
+    this.facingMarker = this.add.image(0, 0, 'dot');
 
     this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H).startFollow(this.player, true);
 
