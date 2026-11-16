@@ -21,10 +21,11 @@ export function png(w, h, rgba) {
 }
 
 /** Packs frames (arrays of equal-length strings, one char per pixel) into a grid; '.' is transparent. */
-export function sheet(frames, palette, size, columns, scale = 1) {
+export function sheet(frames, palette, size, columns, scale = 1, bg = null) {
   const rows = Math.ceil(frames.length / columns);
   const W = columns * size * scale, H = rows * size * scale;
   const px = new Uint8Array(W * H * 4);
+  if (bg !== null) for (let i = 0; i < W * H; i++) px.set([(bg >> 16) & 255, (bg >> 8) & 255, bg & 255, 255], i * 4);
   frames.forEach((f, i) => {
     if (f.length !== size) throw new Error(`frame ${i} has ${f.length} rows`);
     f.forEach((row, y) => {
