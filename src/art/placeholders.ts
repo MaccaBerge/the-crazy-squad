@@ -1,7 +1,7 @@
 import type * as Phaser from 'phaser';
 import type { CharacterDef } from '../characters/types';
 
-export const FRAME = 24; // character frame size (art blueprint §1)
+export const FRAME = 32; // character frame size (art blueprint §1)
 
 // 5×5 pixel glyphs, so initials stay crisp instead of using a blurry browser font.
 const GLYPHS: Record<string, string[]> = {
@@ -23,14 +23,14 @@ export function makePlaceholderTextures(scene: Phaser.Scene, defs: CharacterDef[
     if (def.sprite || scene.textures.exists(key)) continue;
     const tex = scene.textures.createCanvas(key, FRAME, FRAME)!;
     const ctx = tex.getContext();
-    // 14×20 body standing on the bottom edge (feet at the bottom centre = sprite origin)
+    // 14×30 body standing on the bottom edge (feet at the bottom centre = sprite origin)
     ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(5, 4, 14, 20);
+    ctx.fillRect(9, 2, 14, 30);
     ctx.fillStyle = css(def.placeholder.color);
-    ctx.fillRect(6, 5, 12, 18);
+    ctx.fillRect(10, 3, 12, 28);
     ctx.fillStyle = '#1a1a1a';
     GLYPHS[def.placeholder.initial].forEach((row, y) =>
-      [...row].forEach((bit, x) => bit === '1' && ctx.fillRect(10 + x, 10 + y, 1, 1)),
+      [...row].forEach((bit, x) => bit === '1' && ctx.fillRect(14 + x, 12 + y, 1, 1)),
     );
     tex.refresh();
   }

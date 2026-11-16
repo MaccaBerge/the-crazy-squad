@@ -1,17 +1,20 @@
 import type { Vec } from '../movement';
 
-export type Dir = 'down' | 'up' | 'left' | 'right';
+export type Dir = 'down' | 'down-right' | 'right' | 'up-right' | 'up' | 'up-left' | 'left' | 'down-left';
 
-/**
- * Snaps a move direction to one of 4 sprite directions (art blueprint §2).
- * Exact diagonals and no input keep the previous direction, so the sprite doesn't flicker.
- */
+// Clockwise from right, matching Math.atan2 with y pointing down.
+const DIRS: Dir[] = ['right', 'down-right', 'down', 'down-left', 'left', 'up-left', 'up', 'up-right'];
+
+/** Snaps a move direction to the nearest of 8 sprite directions (art blueprint §2). No input keeps the previous one. */
 export function snapDir(prev: Dir, move: Vec): Dir {
-  const ax = Math.abs(move.x), ay = Math.abs(move.y);
-  if (ax === ay) return prev;
-  if (ax > ay) return move.x > 0 ? 'right' : 'left';
-  return move.y > 0 ? 'down' : 'up';
+  if (!move.x && !move.y) return prev;
+  const octant = Math.round(Math.atan2(move.y, move.x) / (Math.PI / 4));
+  return DIRS[(octant + 8) % 8];
 }
 
-/** Sprite sheets draw down, up and side; left is side flipped. */
-export const sheetDir = (d: Dir) => (d === 'left' || d === 'right' ? 'side' : d);
+/** Sheets draw down, down-side, side, up-side and up; the left-facing ones are those flipped. */
+export function sheetDir(d: Dir): { row: 'down' | 'down-side' | 'side' | 'up-side' | 'up'; flip: boolean } {
+  const flip = d.endsWith('left');
+  const row = d === 'down' || d === 'up' ? d : d === 'left' || d === 'right' ? 'side' : d.startsWith('down') ? 'down-side' : 'up-side';
+  return { row, flip };
+}

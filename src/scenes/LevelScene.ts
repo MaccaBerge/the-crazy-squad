@@ -157,10 +157,11 @@ export class LevelScene extends Phaser.Scene {
     s.setDepth(DEPTH.actors + s.y); // y-sort by feet
     const { sprite } = this.party.active;
     // Placeholders show facing with a dot; real art shows it with the animation.
-    this.facingDot.setVisible(!sprite).setPosition(s.x + this.facing.x * 5, s.y - 10 + this.facing.y * 5).setDepth(s.depth + 0.5);
+    this.facingDot.setVisible(!sprite).setPosition(s.x + this.facing.x * 5, s.y - 14 + this.facing.y * 5).setDepth(s.depth + 0.5);
     if (sprite) {
       const moving = s.body.velocity.length() > 5;
-      s.setFlipX(this.dir === 'left').play(`${sprite}/${moving ? 'walk' : 'idle'}-${sheetDir(this.dir)}`, true);
+      const { row, flip } = sheetDir(this.dir);
+      s.setFlipX(flip).play(`${sprite}/${moving ? 'walk' : 'idle'}-${row}`, true);
     }
     this.rig.update(s.body.velocity, this.moveParams(this.party.active).maxSpeed, delta / 1000);
   }
