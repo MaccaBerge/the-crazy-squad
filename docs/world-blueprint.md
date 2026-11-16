@@ -40,22 +40,25 @@ We use **[Tiled](https://www.mapeditor.org/)** (free). It has the most establish
 ### Files
 
 ```
-assets/
-  maps/            level-01.tmj, level-02.tmj, house-interior.tmj …   (Tiled JSON maps)
-  tilesets/        terrain.png + terrain.tsj, buildings.png + buildings.tsj …
+public/assets/            (served as-is by Vite, loaded by Phaser)
+  maps/            test.tmj, level-01.tmj, house-interior.tmj …   (Tiled JSON maps)
+  tilesets/        placeholder.png, terrain.png …   (one image per tileset)
   sprites/         marcus.png, dog-chihuahua.png …
 tiled/
   crazy-squad.tiled-project   (shared custom classes and enums, committed to git)
   templates/                  dog-chihuahua.tx, portal.tx …   (reusable objects)
 ```
 
-### Required Tiled settings
+### Workflow and required Tiled settings
 
-These matter. Phaser's Tiled parser **does not resolve templates or custom-class defaults**, and it **can't load "collection of images" tilesets**.
-- Export as **JSON** (`.tmj`).
-- In *Preferences → Export*, turn on **Embed tilesets**, **Detach templates** and **Resolve object types and properties**. The exported file then contains everything, and Phaser sees the default values from our custom classes.
-- Each tileset is **one image** (a sprite sheet), 16×16 tiles, with no margin or spacing.
-- Always open maps through the `.tiled-project` file, so everyone uses the same custom classes.
+Maps are **saved directly** as JSON in `public/assets/maps/`. There's no separate export step to forget. Phaser's Tiled parser **can't load external tilesets or "collection of images" tilesets**, and **doesn't resolve templates or custom-class defaults**, so:
+- Open `tiled/crazy-squad.tiled-project` first (*File → Open File or Project*), so everyone uses the same custom classes.
+- Save maps as **JSON** (`.tmj`) with **CSV** layer format (*Map → Map Properties → Tile Layer Format*).
+- **Embed tilesets** in each map (*Map → Embed Tileset*, or tick "Embed in map" when adding one).
+- Each tileset is **one image** (a sprite sheet), 16×16 tiles, with no margin or spacing. Its name in Tiled must match its file name and be listed in `TILESETS` in `src/world/constants.ts`.
+- **Templates:** when we start using them, detach them before saving (*right-click → Detach*). In code, fields left at their class default are filled in from the defaults in our registry.
+
+`src/world/maps.test.ts` checks every map against these rules in CI, with messages that say how to fix each problem.
 
 ### Custom classes and enums (in the Tiled project)
 
