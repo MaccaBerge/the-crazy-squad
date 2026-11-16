@@ -7,13 +7,13 @@ How a person controls the squad, how key presses and controller buttons become a
 - **Singleplayer first.** One person plays on one computer.
 - **No local multiplayer or split screen.**
 - **Online multiplayer may come later.** Nothing we build now may make that harder. [Section 3](#3-online-ready-architecture) lists exactly what that means in practice.
-- **The squad (recommended, open to change):** you control **one** of the four characters at a time and can **swap** between them. The other three follow as **AI teammates**. Later, online, each friend simply controls one of the four, using the same code path. See [section 2](#2-the-squad-in-singleplayer) for the alternatives.
+- **One character on the map at a time.** You play as one of the four and **swap** to another in place. After a swap, you must wait out a **swap cooldown** before swapping again. There are no AI teammates. Later, online, each friend controls one of the four, using the same code path. See [section 2](#2-the-squad-in-singleplayer).
 
 ---
 
 ## 1. Principles
 
-1. **Characters never read the keyboard.** A character is driven by an **intent**: "move this way, attack, use ability 1". Something else produces that intent: your keyboard, a controller, the companion AI, a dog's AI, or later a network message. This one split is what keeps online play possible.
+1. **Characters never read the keyboard.** A character is driven by an **intent**: "move this way, attack, use ability 1". Something else produces that intent: your keyboard, a controller, a dog's AI, or later a network message. This one split is what keeps online play possible.
 2. **Gameplay reacts to actions, not keys.** Code checks `attack`, never `Space`. Keys and buttons are mapped to actions in one data file.
 3. **There is no global "the player".** There's a *local player* (the person at this computer) who currently controls *a character*. The camera, HUD and input prompts follow `localPlayer.character`, which can change when you swap, and later differs per computer online.
 4. **Gameplay state is plain data on entities.** Health, cooldowns, positions and who's downed live in component fields, not in visual properties like "the sprite is half transparent so it must be invulnerable". Plain data can later be sent over the network.
@@ -23,29 +23,36 @@ How a person controls the squad, how key presses and controller buttons become a
 
 ## 2. The squad in singleplayer
 
-### Recommended: swap between characters, with AI teammates
+### One character at a time, swap with a cooldown
 
-- Press **Tab** to cycle, or **1–4** to jump straight to Marcus, Kristian, Christian or Jonas. On a controller, use **LB / RB**.
-- The swap is **instant**, with a short cooldown (about 0.5 s) so it can't be spammed. The camera glides to the new character.
-- **Swapped-out characters keep recharging** their ability cooldowns. Swapping to use everyone's abilities in turn becomes a skill, a pattern used by co-op games with single-player swapping.
-- **AI teammates** follow you, keep out of your way, avoid danger and help fight with simple behaviour. Building a *good* companion AI is known to be hard, so they start simple: follow, stay out of the way, and attack dogs near them.
-- **Puzzles can need specific characters**, like "only Jonas fits through", "only Kristian can push this". That's the payoff of each character having abilities from your real-life skills.
-- **Teammates who fall behind** (more than about 1.5 screens away, or stuck) are moved to a spot near you just off screen. It's a standard companion trick that players never notice.
+- **Only the character you're playing is on the map.** The other three are "off stage".
+- **Swapping replaces the character in place.** The new character appears where the old one stood, facing the same way, with a short swap effect (a puff of smoke and a sound).
+- **Swap cooldown:** after any swap, swapping is locked for a while, about **4 s** to start and tunable in the T panel. This makes *who you're playing right now* a real decision instead of something you flick between every second. The HUD shows the cooldown.
+- **Controls:** **Tab** cycles to the next character, **1–4** jump straight to Marcus, Kristian, Christian or Jonas, and **LB / RB** cycle on a controller.
+- **You can't swap to a downed character.** If the new character's body doesn't fit where you're standing, for example a wider character in a tight gap, the swap is refused with a "no room" sound. Being pushed to the nearest free spot is the alternative if refusing feels bad.
+- **A short safety window:** the incoming character is invulnerable for about 0.3 s, so swapping into a crowd of dogs isn't an instant hit.
+- **Every character keeps their own state** while off stage: health, ability cooldowns and anything they carry. **Ability cooldowns keep recharging off stage**, so swapping to use someone whose ability is ready is part of the strategy.
+- **Puzzles and fights can need specific characters**, like "only Jonas fits through", "only Kristian can push this", "Christian's ability is best against bulldogs". That's the payoff of each character having abilities from your real-life skills.
 
 ### Going down
 
-- When the character you control drops to 0 HP, they're **downed** and you're **automatically swapped** to the nearest teammate who isn't.
-- A downed teammate is **revived** by standing next to them for about 2 seconds. Off-screen downed teammates get an arrow at the screen edge.
+- When the character you're playing drops to 0 HP, they're **downed** and you're **forced to swap** to the next character who isn't downed. This forced swap **ignores the cooldown** and starts it again.
+- A downed character **stays out until the next checkpoint** (or a revive pickup, if we add one), when they come back with some health.
 - If **all four** are down, restart from the last checkpoint.
-- These rules work unchanged online, where each friend revives the others.
+
+All numbers here (cooldown length, safety window, revive health) are starting values for the tuning panel.
+
+### Online later
+
+Online, each friend controls one character, so all four are on the map at once and swapping isn't used. The code is built so any number of characters can be on the map, each with its own controller. Singleplayer just spawns one at a time. A downed character online could be revived by teammates standing next to them, which can be decided then.
 
 ### Alternatives considered
 
-| Option | Why not (for now) |
+| Option | Why not |
 |---|---|
+| AI teammates follow you while you control one | Good companion AI is hard to build, and you chose one character at a time |
 | Choose one character per level, no swapping | You'd lose the squad feeling and puzzles that need several of you |
-| All four move together as one unit | Hard to make abilities and positioning interesting |
-| Teammates only appear in cutscenes | Doesn't use the four-character idea at all |
+| Instant swapping with no cooldown | Swapping becomes button-mashing, and characters' strengths matter less |
 
 ---
 
@@ -76,11 +83,10 @@ The industry lesson is consistent: **multiplayer added at the end usually means 
   | Controller | Drives |
   |---|---|
   | `LocalController` | The character you control, from keyboard and gamepad |
-  | `CompanionAI` | Your three teammates |
   | `DogAI` (one per breed) | Dogs. They use the same intent interface, so dogs and players share all movement and ability code. |
   | `RemoteController` (later) | A friend's character online, fed by network messages |
 
-- **`Party`** (`src/party/party.ts`) decides which controller drives which character. Swapping is just "give `LocalController` to Jonas and `CompanionAI` to Marcus".
+- **`Party`** (`src/party/party.ts`) owns all four characters and their state, decides which one is on the map and which controller drives it, and runs the swap cooldown. A swap removes the current character from the map, puts the next one at the same spot, and gives it `LocalController`.
 
 ### Rules that keep online possible (do these now)
 
@@ -167,7 +173,6 @@ One camera follows `localPlayer.character`. Using the "Scroll Back" camera vocab
 | **Small deadzone** | about 16×12 px, Phaser `setDeadzone` | Tiny movements don't wobble the screen |
 | **Lookahead** | Up to about 24 px toward where you're moving, smoothed (Phaser `setFollowOffset`, updated each step) | You see more of what's ahead, like the dogs you're running toward |
 | **Bounds** | The map edges, or a `CameraBounds` zone for rooms and arenas | Never shows outside the map |
-| **Swap glide** | Pan to the new character over about 250 ms (`cam.pan`) | You can see where you went |
 | **Screen shake** | A "trauma" value that big events add to and that decays. Shake grows with trauma², with a settings option to reduce it. | Strong hits feel strong, and small ones don't spam shake |
 | **Pans for story moments** | `cam.pan` / `cam.zoomTo` in cutscenes, like showing the cat or a door that opened | |
 
@@ -180,8 +185,8 @@ Pixel-art rules, learned from the stutter fix:
 ## 6. HUD (minimal)
 
 - Four **portraits** in a corner (Marcus, Kristian, Christian, Jonas) with health bars. The active one is highlighted, downed ones are greyed out, and the number key (1–4) is shown next to each.
-- **Ability cooldowns** for the active character.
-- **Arrows at the screen edge** pointing to off-screen downed teammates.
+- The **swap cooldown** as a ring or bar over the portraits, so you can see when you can swap again.
+- **Ability cooldowns** for the active character, plus a small "ready" mark on off-stage portraits whose ability has recharged.
 - The HUD reads state and never changes it. It uses fixed camera positions (`setScrollFactor(0)`) and the `ui` depth band.
 
 ---
@@ -196,10 +201,9 @@ src/
     intent.ts         Intent type + empty intent
     localController.ts  keyboard + gamepad → Intent, buffering, blur handling (tested)
   party/
-    party.ts          the four characters, who controls whom, swapping, downed and revive (tested)
-    companionAI.ts    follow, keep distance, catch up, simple fighting
+    party.ts          the four characters, who's on the map, swapping + cooldown, downed (tested)
   camera/
-    cameraRig.ts      follow, deadzone, lookahead, swap glide, shake
+    cameraRig.ts      follow, deadzone, lookahead, shake
   sim/
     random.ts         seeded random numbers for gameplay
   net/                (empty until online is built)
@@ -209,9 +213,9 @@ src/
 
 ## 8. Build order
 
-1. **Next (with world build step 2, the four characters):** `Intent`, actions and bindings, `LocalController` for the keyboard (including blur handling and capture), `Party` with four placeholder characters and swapping, simple follow-only `CompanionAI`, movement moved into the physics step with analog-ready capping, and `cameraRig` with lookahead and swap glide.
+1. **Next (with world build step 2, the four characters):** `Intent`, actions and bindings, `LocalController` for the keyboard (including blur handling and capture), `Party` with four placeholder characters, swapping in place with the cooldown (in the tuning panel), movement moved into the physics step with analog-ready capping, and `cameraRig` with lookahead.
 2. **Soon after:** gamepad support, the HUD portraits, the seeded random module.
-3. **With combat:** buffered actions, downed and revive, companions that fight, screen shake.
+3. **With combat:** buffered actions, downed characters and forced swaps, the swap safety window, screen shake.
 4. **Later, if wanted:** rebinding in a settings menu, mouse aiming, and online play following section 3.
 
 ---
@@ -224,4 +228,5 @@ src/
 - [1500 Archers on a 28.8: Network Programming in Age of Empires and Beyond](https://www.gamedeveloper.com/programming/1500-archers-on-a-28-8-network-programming-in-age-of-empires-and-beyond), [Multiplayer I: Introduction (Dave Kilian)](https://davekilian.com/multiplayer-i.html) and [network input handling (gamedev.net)](https://gamedev.net/forums/topic/635009-network-input-handling/5006469/): commands separate from simulation, and why multiplayer is hard to add late
 - [DISCBALL3D (three.js forum)](https://discourse.threejs.org/t/discball3d-multiplayer-soccer/95207), [Colyseus netcode docs](https://docs.colyseus.io/netcode) and [NetplayJS](https://awesome.ecosyste.ms/projects/github.com%2Frameshvarun%2Fnetplayjs): host-in-browser over WebRTC, prediction, interpolation, server option for Phaser
 - [Input handling guide (claudeskills.info)](https://claudeskills.info/skills/thedivergentai/gd-agentic-skills/input-handling/), [managing key bindings (uhiyama-lab)](https://uhiyama-lab.com/en/notes/godot/input-map-key-binding-management/), [coyote time and input buffering explained (bugnet)](https://bugnet.io/blog/coyote-time-and-input-buffering-explained) and [input buffering, action canceling (Medium)](https://medium.com/@yosispring/input-buffering-action-canceling-and-also-forbidden-knowledge-47a3f8a95151): action maps, last-used device prompts, 100–150 ms buffers, catching presses for fixed-step logic
-- [Building a better single-player and co-op experience (Cellar Door Games)](https://cellardoorgames.com/making-a-better-single-player-and-multiplayer-experience), [Marvel Ultimate Alliance 3 single-player (Twinfinite)](https://twinfinite.net/features/you-dont-need-multiplayer-to-have-fun-in-marvel-ultimate-alliance-3/) and [Wolfenstein: Youngblood companion AI (GoNintendo)](https://gonintendo.com/archives/312051-wolfenstein-youngblood-s-devs-say-creating-a-realiable-ai-companion-was-really): character swapping, background cooldowns, AI companions that follow and fight
+- [Building a better single-player and co-op experience (Cellar Door Games)](https://cellardoorgames.com/making-a-better-single-player-and-multiplayer-experience): character swapping in single-player with cooldowns recharging in the background
+- [Wolfenstein: Youngblood companion AI (GoNintendo)](https://gonintendo.com/archives/312051-wolfenstein-youngblood-s-devs-say-creating-a-realiable-ai-companion-was-really): why reliable AI companions are hard to build, one reason we don't use them
