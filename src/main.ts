@@ -3,10 +3,19 @@ import { HudScene } from './scenes/HudScene';
 import { LevelScene, tuning } from './scenes/LevelScene';
 import { tuningPanel } from './tuning';
 
-new Phaser.Game({
+// The shorter screen side always shows VIEW px of the world; the longer side shows more,
+// so the game fills any screen shape (phone, ultrawide) without black bars.
+const VIEW = 240;
+const viewSize = (): [number, number] => {
+  const s = Math.min(innerWidth, innerHeight) / VIEW;
+  return [Math.round(innerWidth / s), Math.round(innerHeight / s)];
+};
+const [width, height] = viewSize();
+
+const game = new Phaser.Game({
   type: Phaser.AUTO,
-  width: 320,
-  height: 240,
+  width,
+  height,
   pixelArt: true,
   roundPixels: true,
   backgroundColor: '#2d5a27',
@@ -14,6 +23,7 @@ new Phaser.Game({
   physics: { default: 'arcade' },
   scene: [LevelScene, HudScene],
 });
+addEventListener('resize', () => game.scale.setGameSize(...viewSize()));
 
 tuningPanel(tuning, {
   maxSpeed: [20, 300, 5],
