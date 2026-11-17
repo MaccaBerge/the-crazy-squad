@@ -12,7 +12,7 @@ import { defaultMove, stepVelocity } from '../movement';
 import { Party, SWAP_ACTIONS, type SwapAction } from '../party/party';
 import { DEFAULT_WEATHER, isWeather, WEATHER } from '../nature/weather';
 import { footForce } from '../nature/forces';
-import { Grass, scatter } from '../nature/grass';
+import { bladesFromMap, Grass, scatter } from '../nature/grass';
 import { gust, wind } from '../nature/wind';
 import { DEPTH, TILE } from '../world/constants';
 import { loadMap, preloadMap } from '../world/loadMap';
@@ -82,9 +82,11 @@ export class LevelScene extends Phaser.Scene {
     makePlaceholderTextures(this, SQUAD);
     createAnims(this, SQUAD);
 
+    const blades = STRESS_BLADES
+      ? scatter({ x: 0, y: 0, w: map.widthInPixels, h: map.heightInPixels }, STRESS_BLADES, 1)
+      : bladesFromMap(map.getObjectLayer('Grass')?.objects ?? []);
+    if (blades.length) this.grass = new Grass(this, blades, map.widthInPixels, DEPTH.actors);
     if (STRESS_BLADES) {
-      const blades = scatter({ x: 0, y: 0, w: map.widthInPixels, h: map.heightInPixels }, STRESS_BLADES, 1);
-      this.grass = new Grass(this, blades, map.widthInPixels, DEPTH.Decor + 1);
       this.readout = document.body.appendChild(document.createElement('div'));
       this.readout.style.cssText = 'position:fixed;bottom:8px;right:8px;padding:4px 8px;background:#000a;color:#fff;font:13px monospace;border-radius:4px;pointer-events:none';
       this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.readout?.remove());

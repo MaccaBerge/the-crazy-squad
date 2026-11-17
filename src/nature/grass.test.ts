@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { bendOffset, MAX_POSE, poseFor, pushFor, scatter, springStep } from './grass';
+import { bladesFromMap, bendOffset, MAX_POSE, poseFor, pushFor, scatter, springStep } from './grass';
 
 test('the same seed scatters the same grass, inside the area, back to front', () => {
   const area = { x: 16, y: 32, w: 100, h: 50 };
@@ -54,4 +54,18 @@ test('a pushed blade gives way fast and springs back to rest', () => {
   expect(Math.abs(p)).toBeLessThan(0.05);
   expect(low).toBeLessThan(0); // a little overshoot past straight
   expect(low).toBeGreaterThan(-1); // but less than one pose
+});
+
+test('grass areas from a map fill rectangles and polygons at their density', () => {
+  const rect = { id: 1, x: 0, y: 0, width: 160, height: 160, properties: [{ name: 'density', type: 'float', value: 4 }] };
+  // A right triangle with half the area of its 160×160 box.
+  const tri = { id: 2, x: 320, y: 0, polygon: [{ x: 0, y: 0 }, { x: 160, y: 0 }, { x: 0, y: 160 }] };
+  const blades = bladesFromMap([rect, tri] as never);
+  const inRect = blades.filter((b) => b.x < 160);
+  const inTri = blades.filter((b) => b.x >= 320);
+  expect(inRect).toHaveLength(400); // 100 tiles × 4
+  expect(inTri.length).toBeGreaterThan(250); // about 50 tiles × 6
+  expect(inTri.length).toBeLessThan(350);
+  expect(inTri.every((b) => b.x - 320 + b.y <= 160)).toBe(true);
+  expect(blades.every((b, i) => i === 0 || blades[i - 1].y <= b.y)).toBe(true);
 });
