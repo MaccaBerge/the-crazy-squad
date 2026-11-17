@@ -1,4 +1,5 @@
 import * as Phaser from 'phaser';
+import type { Force } from './forces';
 import type { WindParams } from './weather';
 import { wind } from './wind';
 
@@ -25,9 +26,34 @@ export interface Blade { x: number; y: number; type: number; lean: number; flex:
 /** Sideways offset (px) of row `r` (0 = root) of a blade `h` tall, in lean pose `pose`: the tip moves most. */
 export const bendOffset = (pose: number, r: number, h: number) => Math.round(pose * 1.3 * (r / (h - 1)) ** 2);
 
-/** The pose a blade takes in a sideways wind of `w` (-1..1). */
-export const poseFor = (lean: number, flex: number, w: number) =>
-  Math.max(-MAX_POSE, Math.min(MAX_POSE, Math.round(lean + w * flex * MAX_POSE)));
+/** The pose a blade takes in a sideways wind of `w` (-1..1), plus `push` poses from bodies moving through it. */
+export const poseFor = (lean: number, flex: number, w: number, push = 0) =>
+  Math.max(-MAX_POSE, Math.min(MAX_POSE, Math.round(lean + w * flex * MAX_POSE + push)));
+
+const FLAT = 0.35; // inside this share of a force's radius, blades are flattened
+
+/**
+ * How many poses a force pushes a blade rooted `dx`, `dy` px from its centre: away from the centre, more the closer
+ * it is, and flat under the feet. Strong enough to beat the wind. 0 outside the force.
+ */
+export function pushFor(dx: number, dy: number, f: Pick<Force, 'rx' | 'ry'>) {
+  const d = Math.hypot(dx / f.rx, dy / f.ry);
+  if (d >= 1) return 0;
+  const strength = d < FLAT ? 1 : (1 - d) / (1 - FLAT);
+  return (dx < 0 ? -1 : 1) * strength * (MAX_POSE + 1);
+}
+
+const STIFFNESS = 220; // spring-back pull
+const DAMPING = 11; // per second; a little overshoot, then still
+const PUSH_IN = 30; // per second; how fast a blade gives way
+
+/** One step of a blade's push towards `target`: quick to give way, springy on the way back. Returns [push, velocity]. */
+export function springStep(push: number, vel: number, target: number, dt: number): [number, number] {
+  if (Math.abs(target) > Math.abs(push) && Math.sign(target) !== -Math.sign(push))
+    return [push + (target - push) * Math.min(1, PUSH_IN * dt), 0];
+  vel = (vel + (target - push) * STIFFNESS * dt) * Math.exp(-DAMPING * dt);
+  return [push + vel * dt, vel];
+}
 
 /** Seeded random numbers in 0..1 (mulberry32), so the same seed always scatters the same grass. */
 export function seeded(seed: number) {
@@ -84,6 +110,11 @@ export class Grass {
   private patch = new Uint32Array(25);
   private mask = Object.assign(new Array<number>(25).fill(0), { 24: 1 }); // member data slot 24 is the frame
   private f32 = new Float32Array(this.patch.buffer);
+  // Pushed blades: how far (in poses) and how fast they're moving back. `active` holds every blade not at rest.
+  private push: Float32Array;
+  private vel: Float32Array;
+  private target: Float32Array;
+  private active = new Set<number>();
 
   constructor(scene: Phaser.Scene, private blades: Blade[], worldWidth: number, depth: number) {
     makeTexture(scene);
@@ -91,6 +122,9 @@ export class Grass {
     const idx = this.layer.frameDataIndices as Record<string, number>;
     this.frames = TYPES.map((_, type) => Array.from({ length: MAX_POSE * 2 + 1 }, (_, i) => idx[`${type}:${i - MAX_POSE}`]));
     this.pose = new Int8Array(blades.length);
+    this.push = new Float32Array(blades.length);
+    this.vel = new Float32Array(blades.length);
+    this.target = new Float32Array(blades.length);
     this.cols = Math.ceil(worldWidth / CHUNK);
     blades.forEach((b, i) => {
       this.layer.addMember({ x: b.x + 0.5, y: b.y + 1, originX: 0.5, originY: 1, frame: `${b.type}:0` });
@@ -99,8 +133,35 @@ export class Grass {
     });
   }
 
+  /** How many blades are pushed or still springing back. */
+  get pushed() {
+    return this.active.size;
+  }
+
+  /** Pushes blades away from each force, and springs released ones back. */
+  private applyForces(forces: readonly Force[], dt: number) {
+    for (const i of this.active) this.target[i] = 0;
+    for (const f of forces)
+      for (let row = Math.floor((f.y - f.ry) / CHUNK); row <= Math.floor((f.y + f.ry) / CHUNK); row++)
+        for (let col = Math.floor((f.x - f.rx) / CHUNK); col <= Math.floor((f.x + f.rx) / CHUNK); col++)
+          for (const i of this.chunks.get(row * this.cols + col) ?? []) {
+            const p = pushFor(this.blades[i].x - f.x, this.blades[i].y - f.y, f);
+            if (!p) continue;
+            if (Math.abs(p) > Math.abs(this.target[i])) this.target[i] = p; // where two bodies overlap, the stronger push wins
+            this.active.add(i);
+          }
+    for (const i of this.active) {
+      [this.push[i], this.vel[i]] = springStep(this.push[i], this.vel[i], this.target[i], dt);
+      if (!this.target[i] && Math.abs(this.push[i]) < 0.05 && Math.abs(this.vel[i]) < 0.05) {
+        this.push[i] = this.vel[i] = 0;
+        this.active.delete(i);
+      }
+    }
+  }
+
   /** Re-poses the blades in view whose pose changed. Returns how many changed, for the stress test readout. */
-  update(view: Phaser.Geom.Rectangle, t: number, weather: WindParams) {
+  update(view: Phaser.Geom.Rectangle, t: number, dt: number, weather: WindParams, forces: readonly Force[]) {
+    this.applyForces(forces, Math.min(dt, 0.05)); // a long frame (tab in the background) would make the spring blow up
     const side = Math.cos((weather.windDir * Math.PI) / 180); // blades lean left/right only
     let changed = 0;
     const c0 = Math.max(0, Math.floor((view.x - VIEW_MARGIN) / CHUNK)), c1 = Math.min(this.cols - 1, Math.floor((view.right + VIEW_MARGIN) / CHUNK));
@@ -112,7 +173,7 @@ export class Grass {
         const w = wind(col * CHUNK + CHUNK / 2, row * CHUNK + CHUNK / 2, t, weather) * side;
         for (const i of members) {
           const b = this.blades[i];
-          const pose = poseFor(b.lean, b.flex, w);
+          const pose = poseFor(b.lean, b.flex, w, this.push[i]);
           if (pose === this.pose[i]) continue;
           this.pose[i] = pose;
           this.f32[24] = this.frames[b.type][pose + MAX_POSE];
