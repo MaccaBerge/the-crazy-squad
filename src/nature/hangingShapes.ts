@@ -74,7 +74,7 @@ export function flagPixels(strength: number, side: number, t: number): Px[] {
   out.push({ x: 0, y: -FLAG_POLE - 1, color: RAMPS.autumn[3] }, { x: 1, y: -FLAG_POLE - 1, color: RAMPS.autumn[2] }); // knob
   const s = Math.max(0, Math.min(1, strength));
   const drop = (c: number) => // how far column c (1 = at the pole) hangs below the top of the pole
-    Math.round((1 - s) * c * 0.7 + (0.5 + 1.5 * s) * (c / CLOTH.w) * Math.sin(c * 0.8 - t * (5 + 7 * s)));
+    Math.round((1 - s) * c * 0.7 + (0.6 + 0.6 * s) * (c / CLOTH.w) * Math.sin(c * 0.5 - t * (3.5 + 2.5 * s))); // a slow, low ripple: faster or higher flickers
   for (let c = 1; c <= CLOTH.w; c++) {
     const dy = drop(c), slope = drop(c + 1) - dy;
     const x = side > 0 ? 1 + c : -c; // out from the pole's downwind side
