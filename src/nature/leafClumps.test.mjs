@@ -1,14 +1,17 @@
 // The real tree images cut into clumps the way the game cuts them.
 import fs from 'node:fs';
 import { expect, test } from 'vitest';
+import { ramps } from '../../art/palette.mjs';
 import { decode } from '../../art/png.mjs';
 import { clumpOffset, findClumps } from './leafClumps.ts';
 import { TREE_TYPES } from './treeTypes.ts';
 
+const BARK = new Set([ramps.wood, ramps.shadow, ramps.stone].flatMap((r) => r.colors));
+
 test.each(Object.entries(TREE_TYPES))('%s cuts into separate leaf clumps above the trunk', (name, t) => {
   const im = decode(fs.readFileSync(`public/assets/trees/${name}.png`));
   const clumps = findClumps(im.px, im.w, im.h, t.swayFrom);
-  expect(clumps.length).toBeGreaterThanOrEqual(8);
+  expect(clumps.length).toBeGreaterThanOrEqual(t.swayFrom > 60 ? 8 : 2); // big trees have many clumps, bushes a few
   const seen = new Set();
   for (const c of clumps) {
     expect(c.pixels.length).toBeGreaterThanOrEqual(12);
@@ -16,7 +19,7 @@ test.each(Object.entries(TREE_TYPES))('%s cuts into separate leaf clumps above t
       expect(seen.has(i)).toBe(false);
       seen.add(i);
       expect(Math.floor(i / im.w)).toBeLessThan(t.swayFrom);
-      expect(im.px[i * 4 + 1]).toBeGreaterThan(im.px[i * 4]); // leaves only, never bark
+      expect(BARK.has((im.px[i * 4] << 16) | (im.px[i * 4 + 1] << 8) | im.px[i * 4 + 2])).toBe(false); // leaves only, never bark
     }
   }
   for (let k = 1; k < clumps.length; k++) expect(clumps[k].lum).toBeGreaterThanOrEqual(clumps[k - 1].lum);

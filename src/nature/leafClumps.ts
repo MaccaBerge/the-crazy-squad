@@ -2,6 +2,8 @@
 // blueprint §5). The brightest leaf spots seed the clumps; the lit leaves around them grow into each clump. The darker
 // leaves stay put underneath, so a moving clump uncovers shade, not holes. Pure, so tests and preview scripts can run it.
 
+import { RAMPS } from './bladeShapes';
+
 export interface Clump {
   pixels: number[]; // indices into the image (y * w + x)
   cx: number; // centre, image px
@@ -16,8 +18,9 @@ const MIN_CLUMP = 12; // px: smaller clumps stay put rather than flicker
 export const UNDER = [0x27, 0x59, 0x6c] as const; // teal 1: the shade a moving clump uncovers
 
 const lum = (r: number, g: number, b: number) => (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-/** Leaves are the green and teal ramps; trunk, bark and roots are warmer (red at least as strong as green). */
-const isLeaf = (r: number, g: number) => g > r;
+/** Leaves are the green, teal and moss ramps, autumn leaves, and berries and blossoms; trunk, bark and roots are wood, shadow or stone. */
+const LEAF_COLORS = new Set<number>([RAMPS.teal, RAMPS.fern, RAMPS.moss, RAMPS.autumn, RAMPS.berry, RAMPS.violet].flat());
+const isLeaf = (r: number, g: number, b: number) => LEAF_COLORS.has((r << 16) | (g << 8) | b);
 
 /** Finds the leaf clumps above row `swayFrom` of an RGBA image. Clumps come back back-to-front (dim first). */
 export function findClumps(px: ArrayLike<number>, w: number, h: number, swayFrom: number): Clump[] {
@@ -25,7 +28,7 @@ export function findClumps(px: ArrayLike<number>, w: number, h: number, swayFrom
   const level = new Float32Array(n).fill(-1); // brightness of lit leaf pixels, -1 elsewhere
   for (let i = 0; i < w * Math.min(h, swayFrom); i++) {
     const [r, g, b, a] = [px[i * 4], px[i * 4 + 1], px[i * 4 + 2], px[i * 4 + 3]];
-    if (a && isLeaf(r, g) && lum(r, g, b) >= LIT) level[i] = lum(r, g, b);
+    if (a && isLeaf(r, g, b) && lum(r, g, b) >= LIT) level[i] = lum(r, g, b);
   }
   const owner = new Int32Array(n).fill(-1);
   const neighbours = (i: number) => {
