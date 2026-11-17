@@ -146,10 +146,16 @@ A field can hold **tens of thousands of blades**, so:
 
 ### Falling leaves
 
-- Now and then a leaf detaches from a bundle and drifts down and along with `wind()`, tumbling through 2–4 pre-drawn frames, then settles on the ground and fades.
-- How often depends on the weather (more in `breezy` and `storm`) and the tree (more for autumn accent trees).
-- A small shared pool of leaf sprites, so the cost stays fixed.
-- Trees rustling when bumped is left for later.
+- **Who sheds:** every tree type has a `shed` rate in `TREE_TYPES`: leaves per second in a light breeze. Big trees shed more than small ones, and bushes will shed less still. A tree's `shed` property in Tiled (a float, 0–10) overrides its type's rate; the map test checks it.
+- **Wind sets the pace:** the rate grows with the wind at the tree, from 0.3× in still air to 2× in full wind (`shedRate`).
+- **Where a leaf starts and lands:** it leaves from a random pixel of the canopy's leaf clumps, in that pixel's colour. It lands somewhere on the ground under the canopy.
+- **The fall** (`src/nature/leafFall.ts`):
+  - it swings back and forth like a pendulum, hanging at each end of the swing and falling fastest through the middle;
+  - meanwhile, the wind where it is carries it downwind;
+  - it tumbles through three 4×3 poses (flat, tilted left, tilted right).
+- **On the ground:** it lies for 4 s, then fades over about a second.
+- **Cost:** a pool of at most 160 leaves keeps the cost fixed.
+- **Not yet:** landed leaves skittering in gusts, and trees rustling when bumped.
 
 ---
 
@@ -174,6 +180,8 @@ src/nature/
   grass.ts       scatter, chunks, poses, the GPU layer   + grass.test.ts (scatter is seeded)
   treeTypes.ts   base, hitbox and sway per tree type
   leafClumps.ts  cutting a canopy into clumps, and how far each moves   + leafClumps.test.mjs
+  leafFall.ts    how a falling leaf moves, and how fast trees shed   + leafFall.test.ts
+  leaves.ts      dropping, drawing and recycling falling leaves
   trees.ts       placing, swaying and fading trees
 art/nature/
   blades/        blade poses (on the palette)
