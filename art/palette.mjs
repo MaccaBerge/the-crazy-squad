@@ -12,6 +12,12 @@ export const ramps = {
   water:  { colors: [0x2e4c84, 0x3d7cc4, 0x5eaee8, 0x8edcf2, 0xe6faf6], outline: 0x241520 },
   skin:   { colors: [0x8a5038, 0xb8754e, 0xd89a6c, 0xf0c49a], outline: 0x4a2a2a },
   light:  { colors: [0xfff6dc], outline: 0x7a4050 },
+  // Cool nature ramps (world-art-style.md): forest shade, canopies and ground cover. Characters and props stay warm.
+  dusk:   { colors: [0x1c1440, 0x2d1952, 0x3c3787, 0x5a5cae], outline: 0x1c1440 },
+  teal:   { colors: [0x0f3a3c, 0x27596c, 0x368578, 0x549e9f, 0x86c9a6], outline: 0x1c1440 },
+  fern:   { colors: [0x1d5217, 0x3f7a2e, 0x629f54, 0xa1b875], outline: 0x1c1440 },
+  moss:   { colors: [0x4f4a1c, 0x6b6324, 0x818634, 0xb3b85a], outline: 0x1c1440 },
+  violet: { colors: [0x2c0d37, 0x4d1852, 0x6a3787, 0x9155a0, 0xb476b8], outline: 0x1c1440 },
 };
 
 /** Every allowed color, as 0xRRGGBB. */
