@@ -132,9 +132,10 @@ A field can hold **tens of thousands of blades**, so:
 
 ### How it moves
 
-- **Row shifting** (DaFluffyPotato): each pixel row above `swayFrom` shifts sideways by whole pixels, more towards the top (up to `sway` px). The trunk below stays put.
-- **Each row feels its own wind,** and lower rows lag the top by up to half a second, so gusts ripple down the canopy. A small flutter keeps the leaves alive even in still air.
-- Each tree has its own canvas texture, redrawn only when a row moves. The lean is the sideways part of the wind, times a small per-tree stiffness so neighbours don't move in lockstep.
+- **Leaf clumps** (DaFluffyPotato's foliage trick): when the level starts, each canopy is cut into clumps. The brightest leaf spots seed them, and the lit leaves around grow into each one (`src/nature/leafClumps.ts`). The darker leaves behind stay put; under each clump they become a single shade, so a moving clump uncovers shadow, not holes.
+- **Each clump moves as one piece** by whole pixels: with the wind where it sits (so gusts roll across the canopy), further near the top, up to `sway` px, plus a little rustle of its own that sometimes lifts it 1 px. Brighter clumps are drawn in front.
+- We tried shifting pixel rows first; it looked like pixels shuffling along a line, not leaves moving.
+- Each tree has its own canvas texture, redrawn only when a clump moves. The lean is the sideways part of the wind, times a small per-tree stiffness so neighbours don't move in lockstep.
 
 ### Walking behind trees
 
@@ -171,7 +172,8 @@ src/nature/
   wind.ts        wind(x, y, t)          + wind.test.ts
   forces.ts      the list of moving bodies that push nature
   grass.ts       scatter, chunks, poses, the GPU layer   + grass.test.ts (scatter is seeded)
-  treeTypes.ts   base, hitbox and sway per tree type   + treeTypes.test.ts
+  treeTypes.ts   base, hitbox and sway per tree type
+  leafClumps.ts  cutting a canopy into clumps, and how far each moves   + leafClumps.test.mjs
   trees.ts       placing, swaying and fading trees
 art/nature/
   blades/        blade poses (on the palette)
@@ -190,7 +192,7 @@ art/trees/
 3. **Pushing:** forces from the characters, spring-back, flattening under feet.
 4. **Grass from Tiled:** the `Grass` layer, seeded scatter, depth with actors.
 5. **Real blade art** on the cool ramps, plus flowers and reeds.
-6. **Trees:** two PixelLab trees, sway, trunk collision, canopy fade. Then more tree types (mostly smaller) and bushes.
+6. **Trees:** two PixelLab trees, leaf-clump sway, trunk collision, canopy fade. Then more tree types (mostly smaller) and bushes.
 7. **Falling leaves.**
 8. **Hanging things** for the neighbourhood.
 9. **Weather look:** tint and darkness per preset.
