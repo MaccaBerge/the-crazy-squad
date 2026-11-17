@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { bladesFromMap, bendOffset, MAX_POSE, poseFor, pushFor, scatter, springStep } from './grass';
+import { AURA, bladesFromMap, bendOffset, MAX_POSE, poseFor, pushFor, scatter, springStep } from './grass';
 
 test('the same seed scatters the same grass, inside the area, back to front', () => {
   const area = { x: 16, y: 32, w: 100, h: 50 };
@@ -35,8 +35,12 @@ test('a force pushes blades away from its centre and flattens them under it', ()
   expect(pushFor(-6, 0, f)).toBeLessThan(0);
   expect(pushFor(9, 0, f)).toBeLessThan(pushFor(5, 0, f));
   expect(Math.abs(pushFor(1, 1, f))).toBe(MAX_POSE + 1);
-  expect(pushFor(10, 0, f)).toBe(0);
-  expect(pushFor(0, 6, f)).toBe(0);
+  // Just outside the body, blades still bend a little; further out, not at all.
+  expect(pushFor(14, 0, f)).toBeGreaterThan(0.4);
+  expect(pushFor(14, 0, f)).toBeLessThan(pushFor(9, 0, f));
+  expect(pushFor(-14, 0, f)).toBeLessThan(0);
+  expect(pushFor(10 * AURA, 0, f)).toBe(0);
+  expect(pushFor(0, 5 * AURA + 1, f)).toBe(0);
   // Under the feet, the push beats even a full wind the other way.
   expect(poseFor(0, 1.2, -1, pushFor(1, 0, f))).toBeGreaterThanOrEqual(0);
 });
