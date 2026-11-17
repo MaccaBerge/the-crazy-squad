@@ -4,7 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { isWeather } from '../nature/weather';
 import { ENTITY_TYPES, MAP_LAYERS, TILE, TILESETS } from './constants';
 
-type TiledLayer = { name: string; type: string; width?: number; height?: number; data?: unknown; encoding?: string; layers?: TiledLayer[]; objects?: { id: number; type?: string; template?: string }[] };
+type TiledLayer = { name: string; type: string; width?: number; height?: number; data?: unknown; encoding?: string; layers?: TiledLayer[]; objects?: { id: number; type?: string; template?: string; ellipse?: boolean; point?: boolean; width?: number; polygon?: unknown[]; properties?: { name: string; value: unknown }[] }[] };
 type TiledMap = { orientation: string; infinite: boolean; width: number; height: number; tilewidth: number; tileheight: number; layers: TiledLayer[]; tilesets: Record<string, unknown>[]; properties?: { name: string; value: unknown }[] };
 
 const files = import.meta.glob('/public/assets/maps/*.tmj', { eager: true, query: '?raw', import: 'default' }) as Record<string, string>;
@@ -57,5 +57,14 @@ describe.each(Object.entries(files))('%s', (_path, raw) => {
   test('has a known weather preset', () => {
     const weather = map.properties?.find((p) => p.name === 'weather')?.value;
     expect(isWeather(weather), `map property "weather" is "${weather}"; use one of WEATHER in src/nature/weather.ts`).toBe(true);
+  });
+
+  test('grass areas are rectangles or polygons with a sensible density', () => {
+    for (const o of map.layers.find((l) => l.name === 'Grass')?.objects ?? []) {
+      expect(o.ellipse || o.point, `grass area ${o.id} must be a rectangle or polygon`).toBeFalsy();
+      expect(o.polygon || o.width, `grass area ${o.id} is empty`).toBeTruthy();
+      const density = o.properties?.find((p) => p.name === 'density')?.value;
+      if (density !== undefined) expect(density, `grass area ${o.id} density (blades per tile)`).toSatisfy((d) => typeof d === 'number' && d > 0 && d <= 64);
+    }
   });
 });

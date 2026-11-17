@@ -82,6 +82,7 @@ It lives in `src/nature/wind.ts` with a unit test (same input, same output; stay
 ### Where grass grows
 
 - In Tiled, a **`Grass` object layer** holds rectangles or polygons: grass areas. Properties: `density` (blades per tile), `types` (which blades), `height` (short or tall), `seed`.
+- Areas are rectangles or polygons. `density` defaults to 6 blades per tile, and `seed` defaults to the object's id. The map test rejects ellipses, points and odd densities.
 - At level load, a **seeded scatter** fills each area with blades. Blades get a small random base lean and a random pose offset, so they don't all look alike.
 - Static grass painted on the ground tiles under them makes the area look full even where blades are sparse.
 
@@ -102,6 +103,8 @@ then rounded to the nearest pose.
 ### Depth
 
 Blades are sorted with the characters by y (`DEPTH.actors + y` in `src/world/constants.ts`). Blades below a character's feet draw in front of them, so a character really stands *in* the grass. Tall grass can hide a dog's legs.
+
+How (step 4): blades are split into 4 px horizontal strips, one GPU layer each, at depth `DEPTH.actors` + the strip's top y. A blade up to 3 px below the feet can still draw behind them, which isn't noticeable. The test map has about 180 strips and still holds 60 fps with 20,000 blades.
 
 ### Performance
 
