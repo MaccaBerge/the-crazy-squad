@@ -1,6 +1,7 @@
 // Checks every map in public/assets/maps against the rules in docs/world-blueprint.md,
 // so a map Phaser can't load (or that breaks our conventions) fails CI instead of the game.
 import { describe, expect, test } from 'vitest';
+import { isTreeName } from '../nature/treeTypes';
 import { isWeather } from '../nature/weather';
 import { ENTITY_TYPES, MAP_LAYERS, TILE, TILESETS } from './constants';
 
@@ -69,6 +70,13 @@ describe.each(Object.entries(files))('%s', (_path, raw) => {
       if (flowers !== undefined) expect(flowers, `grass area ${o.id} flowers (share 0–1)`).toSatisfy((f) => typeof f === 'number' && f >= 0 && f <= 1);
       const kind = o.properties?.find((p) => p.name === 'kind')?.value;
       if (kind !== undefined) expect(['grass', 'reeds'], `grass area ${o.id} kind`).toContain(kind);
+    }
+  });
+
+  test('trees are points with a known tree type', () => {
+    for (const o of map.layers.find((l) => l.name === 'Trees')?.objects ?? []) {
+      expect(o.point, `tree ${o.id} must be a point (where the trunk meets the ground)`).toBe(true);
+      expect(isTreeName(o.type), `tree ${o.id} has unknown type "${o.type}"; see TREE_TYPES in src/nature/treeTypes.ts`).toBe(true);
     }
   });
 });
