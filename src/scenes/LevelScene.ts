@@ -13,6 +13,7 @@ import { Party, SWAP_ACTIONS, type SwapAction } from '../party/party';
 import { DEFAULT_WEATHER, isWeather, WEATHER } from '../nature/weather';
 import { footForce } from '../nature/forces';
 import { bladesFromMap, Grass, scatter } from '../nature/grass';
+import { FallingLeaves } from '../nature/leaves';
 import { preloadTrees, Trees } from '../nature/trees';
 import { gust, wind } from '../nature/wind';
 import { DEPTH, TILE } from '../world/constants';
@@ -61,6 +62,7 @@ export class LevelScene extends Phaser.Scene {
   private windView!: Phaser.GameObjects.Graphics;
   private grass?: Grass;
   private trees!: Trees;
+  private leaves!: FallingLeaves;
   private readout?: HTMLDivElement;
 
   constructor() {
@@ -111,6 +113,7 @@ export class LevelScene extends Phaser.Scene {
     onStage(this.active, spawn.x, spawn.y);
     this.trees = new Trees(this, map.getObjectLayer('Trees')?.objects ?? []);
     this.physics.add.collider(this.sprites, [...colliders, ...this.trees.bodies]);
+    this.leaves = new FallingLeaves(this, this.trees.sources);
     this.facingDot = this.add.image(0, 0, 'dot');
     this.staminaBar = this.add.graphics().setDepth(DEPTH.effects);
 
@@ -217,6 +220,7 @@ export class LevelScene extends Phaser.Scene {
     this.drawStamina(s, delta / 1000);
     if (this.windView.visible) this.drawWind();
     this.trees.update(this.time.now / 1000, delta / 1000, tuning, s);
+    this.leaves.update(this.time.now / 1000, Math.min(delta / 1000, 0.05), tuning);
     if (this.grass) {
       const start = performance.now();
       const forces = [footForce(s.x, s.y, this.party.active.body.w)];

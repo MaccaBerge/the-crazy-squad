@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import type { MapObject } from '../world/spawner';
+import { type MapObject, props } from '../world/spawner';
 import { DEPTH } from '../world/constants';
 import { clumpOffset, findClumps, UNDER, type Clump } from './leafClumps';
 import { isTreeName, TREE_TYPES, type TreeType } from './treeTypes';
@@ -21,7 +21,13 @@ export function preloadTrees(scene: Phaser.Scene) {
 interface Parts {
   base: HTMLCanvasElement;
   clumps: { clump: Clump; piece: HTMLCanvasElement; x: number; y: number }[];
+  spots: LeafSpot[]; // every clump pixel: where falling leaves come from, and their colour
 }
+
+export interface LeafSpot { x: number; y: number; color: number }
+
+/** Where a tree drops leaves from: its canopy's spots in world px, the ground under it, and how many per second. */
+export interface LeafSource { left: number; top: number; baseY: number; spots: LeafSpot[]; shed: number }
 
 function cutParts(img: HTMLImageElement, type: TreeType): Parts {
   const canvas = (w: number, h: number) => Object.assign(document.createElement('canvas'), { width: w, height: h });
@@ -30,6 +36,7 @@ function cutParts(img: HTMLImageElement, type: TreeType): Parts {
   ctx.drawImage(img, 0, 0);
   const data = ctx.getImageData(0, 0, img.width, img.height);
   const src = Uint8ClampedArray.from(data.data);
+  const spots: LeafSpot[] = [];
   const clumps = findClumps(src, img.width, img.height, type.swayFrom).map((clump) => {
     const xs = clump.pixels.map((i) => i % img.width), ys = clump.pixels.map((i) => Math.floor(i / img.width));
     const x = Math.min(...xs), y = Math.min(...ys);
@@ -39,13 +46,14 @@ function cutParts(img: HTMLImageElement, type: TreeType): Parts {
     for (const i of clump.pixels) {
       const o = ((Math.floor(i / img.width) - y) * piece.width + (i % img.width) - x) * 4;
       out.data.set(src.subarray(i * 4, i * 4 + 4), o);
+      spots.push({ x: i % img.width, y: Math.floor(i / img.width), color: (src[i * 4] << 16) | (src[i * 4 + 1] << 8) | src[i * 4 + 2] });
       data.data.set([...UNDER, 255], i * 4);
     }
     pctx.putImageData(out, 0, 0);
     return { clump, piece, x, y };
   });
   ctx.putImageData(data, 0, 0);
-  return { base, clumps };
+  return { base, clumps, spots };
 }
 
 interface Tree {
@@ -59,6 +67,7 @@ interface Tree {
 
 export class Trees {
   readonly bodies: Phaser.Physics.Arcade.StaticBody[] = [];
+  readonly sources: LeafSource[] = [];
   private trees: Tree[] = [];
   private parts = new Map<string, Parts>();
 
@@ -76,6 +85,11 @@ export class Trees {
       tex.refresh();
       const sprite = scene.add.image(x, y, tex).setDepth(DEPTH.actors + y);
       sprite.setOrigin(t.base.x / img.width, t.base.y / img.height);
+      const shed = props(o).shed;
+      this.sources.push({
+        left: x - t.base.x, top: y - t.base.y, baseY: y, spots: parts.spots,
+        shed: typeof shed === 'number' ? shed : t.shed,
+      });
       this.bodies.push(scene.physics.add.staticBody(x - t.block.w / 2, y - t.block.h, t.block.w, t.block.h));
       this.trees.push({ sprite, tex, parts, type: t, offsets: new Int8Array(parts.clumps.length * 2).fill(99), flex: 0.8 + ((o.id * 7919) % 100) / 250 }); // trees differ a little in stiffness
     }
