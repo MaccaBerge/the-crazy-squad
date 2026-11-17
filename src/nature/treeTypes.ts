@@ -9,7 +9,7 @@ export interface TreeType {
   shed: number; // leaves per second in a light breeze (more in strong wind); big trees shed more than small ones and bushes. A tree's `shed` property in Tiled overrides it
 }
 
-export const TREE_TYPES = {
+const GREEN = {
   'spreading-oak': { base: { x: 77, y: 146 }, block: { w: 24, h: 8 }, swayFrom: 110, sway: 3, shed: 0.8 },
   gnarled: { base: { x: 77, y: 122 }, block: { w: 20, h: 6 }, swayFrom: 92, sway: 2, shed: 0.4 },
   'autumn-maple': { base: { x: 29, y: 70 }, block: { w: 10, h: 5 }, swayFrom: 54, sway: 2, shed: 0.6 },
@@ -21,6 +21,18 @@ export const TREE_TYPES = {
   'berry-bush': { base: { x: 14, y: 25 }, block: { w: 16, h: 5 }, swayFrom: 26, sway: 1, shed: 0.08 },
   'flowering-bush': { base: { x: 15, y: 26 }, block: { w: 18, h: 5 }, swayFrom: 27, sway: 1, shed: 0.1 },
 } satisfies Record<string, TreeType>;
+
+/** Autumn recolours (art/trees/autumn.mjs): same shape, so the same trunk, hitbox and sway; autumn trees shed more. */
+const autumn = (t: TreeType): TreeType => ({ ...t, shed: t.shed * 1.5 });
+
+export const TREE_TYPES = {
+  ...GREEN,
+  'autumn-young-oak': autumn(GREEN['young-oak']),
+  'autumn-slender-tree': autumn(GREEN['slender-tree']),
+  'autumn-round-bush': autumn(GREEN['round-bush']),
+  'autumn-berry-bush': autumn(GREEN['berry-bush']),
+  'autumn-flowering-bush': autumn(GREEN['flowering-bush']),
+};
 
 export type TreeName = keyof typeof TREE_TYPES;
 export const isTreeName = (name: unknown): name is TreeName => typeof name === 'string' && name in TREE_TYPES;
