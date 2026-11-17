@@ -1,5 +1,12 @@
 {
-  "note": "PixelLab sources of public/assets/trees/*.png: create_object_pro_flash, 160x160, 1 direction, low top-down, the nature palette, Marcus's south sprite as style anchor.",
+  "note": "PixelLab sources of public/assets/trees/*.png: create_object_pro_flash, 1 direction, low top-down, the nature palette (plus autumn, berry or violet where used), Marcus's south sprite as style anchor. The big two are 160x160 canvases; the rest were 96, 128 or 48 px canvases cropped to their content. autumn-* files are recolours made by art/trees/autumn.mjs.",
   "spreading-oak": "d60ff39b-ff32-44c7-9d87-3a86f20ccc8f",
-  "gnarled": "591898f3-3aa4-4874-b0a2-b81a6bfcfd35"
+  "gnarled": "591898f3-3aa4-4874-b0a2-b81a6bfcfd35",
+  "autumn-maple": "e79f9276-0c1f-4451-ac50-6885290d16e5",
+  "young-oak": "8ed44b2f-3949-48b4-90e2-ca980260d4a1",
+  "slender-tree": "9189375b-c98d-4701-a942-7eee8511fdc9",
+  "small-pine": "b60d37ab-cd36-48f9-927a-41a7f9e73888",
+  "round-bush": "eda27f91-124f-4ffb-a9c9-c6c2c16e6c48",
+  "berry-bush": "c34f32d3-fadd-494a-a5a3-3aaa0bf0338b",
+  "flowering-bush": "d19ab5b1-ade5-4825-ab8b-1947a88727ee"
 }

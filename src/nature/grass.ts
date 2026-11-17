@@ -68,9 +68,10 @@ export function seeded(seed: number) {
 
 export const DEFAULT_FLOWERS = 0.04; // share of a grass area's blades that are flowers
 const REED_SHARE = 0.7; // share of a reed area's blades that are reeds; the rest is grass
+const AUTUMN_SHARE = 0.85; // share of an autumn area's grass that has turned; the rest stays green
 
-/** What grows in an area: grass with some flowers, or reeds with some grass. */
-export interface Mix { reeds?: boolean; flowers?: number }
+/** What grows in an area: grass with some flowers, reeds with some grass, or autumn grass with some green and flowers. */
+export interface Mix { reeds?: boolean; autumn?: boolean; flowers?: number }
 
 /** `count` blades scattered evenly at random over a rectangle, sorted back to front. */
 export function scatter(
@@ -78,11 +79,12 @@ export function scatter(
   count: number,
   seed: number,
   inside: (x: number, y: number) => boolean = () => true,
-  { reeds = false, flowers = DEFAULT_FLOWERS }: Mix = {},
+  { reeds = false, autumn = false, flowers = DEFAULT_FLOWERS }: Mix = {},
 ): Blade[] {
   const rnd = seeded(seed);
   const blades = Array.from({ length: count }, () => {
-    const kind: BladeKind = reeds ? (rnd() < REED_SHARE ? 'reed' : 'grass') : rnd() < flowers ? 'flower' : 'grass';
+    const grass = (): BladeKind => (autumn && rnd() < AUTUMN_SHARE ? 'autumn' : 'grass');
+    const kind: BladeKind = reeds ? (rnd() < REED_SHARE ? 'reed' : 'grass') : rnd() < flowers ? 'flower' : grass();
     return {
       x: Math.floor(area.x + rnd() * area.w),
       y: Math.floor(area.y + rnd() * area.h),
@@ -109,7 +111,7 @@ function insidePolygon(pts: { x: number; y: number }[], x: number, y: number) {
 /**
  * Blades for every area on a map's `Grass` object layer (rectangles or polygons), sorted back to front.
  * Optional properties: `density` (blades per tile), `seed` (defaults to the object's id, so each area differs),
- * `flowers` (share of blades that are flowers) and `kind` ("grass", the default, or "reeds").
+ * `flowers` (share of blades that are flowers) and `kind` ("grass", the default, "reeds" or "autumn").
  */
 export function bladesFromMap(areas: MapObject[]): Blade[] {
   return areas
@@ -122,7 +124,7 @@ export function bladesFromMap(areas: MapObject[]): Blade[] {
       const box = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
       const count = Math.round(((box.w * box.h) / TILE ** 2) * density);
       const inside = poly && ((px: number, py: number) => insidePolygon(poly, px + 0.5, py + 0.5));
-      return scatter(box, count, seed, inside, { reeds: kind === 'reeds', flowers });
+      return scatter(box, count, seed, inside, { reeds: kind === 'reeds', autumn: kind === 'autumn', flowers });
     })
     .sort((a, b) => a.y - b.y);
 }

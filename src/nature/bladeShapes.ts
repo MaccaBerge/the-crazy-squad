@@ -13,7 +13,7 @@ export const RAMPS = {
 } as const;
 type Ramp = keyof typeof RAMPS;
 
-export type BladeKind = 'grass' | 'flower' | 'reed';
+export type BladeKind = 'grass' | 'flower' | 'reed' | 'autumn';
 
 /**
  * One drawing, top row first, root row last. `.` is empty, a digit is a step of `ramp` (0 = darkest),
@@ -40,6 +40,11 @@ export const SHAPES: Shape[] = [
   { name: 'violet flower', kind: 'flower', ramp: 'fern', head: 'violet', root: 1, rows: ['.e.', 'ede', '.c.', '.2.', '.2.', '.1.', '.1.', '.1.'] },
   { name: 'gold flower', kind: 'flower', ramp: 'fern', head: 'autumn', rows: ['ed', 'dc', '2.', '2.', '1.', '1.', '1.'] },
   { name: 'pink flower', kind: 'flower', ramp: 'fern', head: 'berry', root: 1, rows: ['.d.', 'dcd', '.2.', '.1.', '.1.', '.1.'] },
+  // Autumn grass: dry olive, golden and rust blades and seed heads, for autumn areas.
+  { name: 'dry short', kind: 'autumn', ramp: 'moss', weight: 3, rows: ['3', '3', '2', '2', '1', '1'] },
+  { name: 'golden tall', kind: 'autumn', ramp: 'autumn', weight: 2, rows: ['3.', '3.', '3.', '2.', '2.', '21', '21', '11', '10', '10'] },
+  { name: 'rust hook', kind: 'autumn', ramp: 'autumn', weight: 1.5, rows: ['.2', '.2', '1.', '1.', '1.', '0.', '0.', '0.'] },
+  { name: 'seed head', kind: 'autumn', ramp: 'moss', head: 'autumn', rows: ['d.', 'dc', 'c.', '2.', '2.', '1.', '1.', '1.'] },
   {
     name: 'cattail', kind: 'reed', ramp: 'moss', head: 'wood',
     rows: ['2.', 'dc', 'cb', 'cb', 'cb', 'ba', '2.', '2.', '2.', '2.', '2.', '1.', '1.', '1.', '1.', '1.', '1.'],
