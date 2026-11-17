@@ -68,3 +68,14 @@ Which ramps each material uses. Ground tiles use only the middle steps (rule 4).
 2. **Generate, then fix.** PixelLab generates candidates (asking for approval first, like the characters). Everything is snapped onto the palette and checked against the rules; small fixes are done by hand.
 3. **Palette check in the build.** `art/build.mjs` checks only character sprites today. It gets the same strict palette check for tilesets and objects before the first one goes in, so an off-palette pixel fails the build.
 4. **Then by area, in route order:** Backyard, neighbourhood street, forest edge, forest, fields and water. Each area's tileset is finished and tested in a map before the next one starts.
+
+## Ground tileset
+
+Inspired by DaFluffyPotato's top-down ground: one calm base everyone shares, with the other terrains sitting on it.
+
+- **Base:** pale sandy dirt with a few darker patches. Everything else meets it.
+- **Grass:** calm, flat green patches on the dirt, under the moving-grass areas. The blades on top give it life; the tile only gives it its green.
+- **Deep grass:** a busier grass with blades and flowers drawn in, kept for deep woods where the ground can be richer.
+- **Water:** sunk below the dirt, with square stepped edges along the tile grid and a short earth bank. Tiles with two or more water corners block movement, and moving grass never grows on blocking tiles.
+- **How it's made:** three PixelLab pro tilesets (`art/tilesets/ground/`, ids in `pixellab.json`), dirt ↔ water, dirt ↔ grass and dirt ↔ deep grass, sharing the same dirt tile and drawn with our palette. `npm run art` packs them into `public/assets/tilesets/ground.png`. Each map embeds it with one corner wangset, `Ground` (Dirt, Grass, Water, Deep grass), so in Tiled you paint terrain and Tiled picks the edge tiles. Grass, deep grass and water never touch each other: keep a strip of dirt between them.
+- **Known limit:** each terrain is one repeating 16 px tile, so big open areas show a pattern. Props, leaves and grass break it up.

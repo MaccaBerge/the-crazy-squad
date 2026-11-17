@@ -93,7 +93,7 @@ export class LevelScene extends Phaser.Scene {
 
     const blades = STRESS_BLADES
       ? scatter({ x: 0, y: 0, w: map.widthInPixels, h: map.heightInPixels }, STRESS_BLADES, 1)
-      : bladesFromMap(map.getObjectLayer('Grass')?.objects ?? []);
+      : bladesFromMap(map.getObjectLayer('Grass')?.objects ?? []).filter((b) => !this.solid(Math.floor(b.x / TILE), Math.floor(b.y / TILE))); // no grass in water or walls
     if (blades.length) this.grass = new Grass(this, blades, map.widthInPixels, DEPTH.actors);
     if (STRESS_BLADES) {
       this.readout = document.body.appendChild(document.createElement('div'));
