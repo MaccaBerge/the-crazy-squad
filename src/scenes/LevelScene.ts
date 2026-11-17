@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { type Dir, sheetDir, snapDir } from '../art/facing';
 import { characterTexture, FRAME, makePlaceholderTextures } from '../art/placeholders';
 import { createAnims, preloadSprites } from '../art/sprites';
+import { defaultStamina } from '../party/stamina';
 import { CameraRig } from '../camera/cameraRig';
 import { SQUAD } from '../characters';
 import type { CharacterDef } from '../characters/types';
@@ -17,8 +18,12 @@ const MAP = 'test';
 const NUDGE_SPEED = 0.6; // corner assist sideways speed, as a share of top speed
 
 /** Live-tunable values (T panel). Character stats multiply the movement values. */
-// runAt: share of max speed above which the run plays. animSpeed: multiplier on walk/run playback, to match feet to ground.
-export const tuning = { ...defaultMove, cameraLerp: 0.15, lookahead: 24, swapCooldown: 4, runAt: 0.6, animSpeed: 1 };
+// maxSpeed is the walk; holding sprint raises it to sprintSpeed while stamina lasts.
+// animSpeed: multiplier on walk/run playback, to match feet to ground.
+export const tuning = {
+  ...defaultMove, maxSpeed: 62, sprintSpeed: 115, ...defaultStamina,
+  cameraLerp: 0.15, lookahead: 24, swapCooldown: 4, animSpeed: 1,
+};
 
 type CharSprite = Phaser.Physics.Arcade.Sprite & { body: Phaser.Physics.Arcade.Body };
 
@@ -40,6 +45,8 @@ export class LevelScene extends Phaser.Scene {
   private solid!: SolidAt;
   private facing = { x: 0, y: 1 };
   private dir: Dir = 'down';
+  private sprinting = false;
+  private staminaBar!: Phaser.GameObjects.Graphics;
   private facingDot!: Phaser.GameObjects.Image;
 
   constructor() {
@@ -75,6 +82,7 @@ export class LevelScene extends Phaser.Scene {
     onStage(this.active, spawn.x, spawn.y);
     this.physics.add.collider(this.sprites, colliders);
     this.facingDot = this.add.image(0, 0, 'dot');
+    this.staminaBar = this.add.graphics().setDepth(DEPTH.effects);
 
     this.rig = new CameraRig(this.cameras.main, tuning);
     this.rig.follow(this.active);
@@ -92,24 +100,26 @@ export class LevelScene extends Phaser.Scene {
     });
 
     this.add
-      .text(4, 4, 'WASD move · Tab/1-4 swap · T tuning · B boxes', { fontFamily: 'monospace', fontSize: '8px', color: '#fff' })
+      .text(4, 4, 'WASD move · Shift sprint · Tab/1-4 swap · T tuning · B boxes', { fontFamily: 'monospace', fontSize: '8px', color: '#fff' })
       .setScrollFactor(0)
       .setDepth(DEPTH.ui);
     this.scene.launch('hud', { party: this.party });
   }
 
-  private moveParams(def: CharacterDef) {
-    return { maxSpeed: tuning.maxSpeed * def.stats.speed, accel: tuning.accel * def.stats.accel, decel: tuning.decel * def.stats.accel };
+  private moveParams(def: CharacterDef, sprint = false) {
+    return { maxSpeed: (sprint ? tuning.sprintSpeed : tuning.maxSpeed) * def.stats.speed, accel: tuning.accel * def.stats.accel, decel: tuning.decel * def.stats.accel };
   }
 
   private step(dt: number) {
     const intent = this.controller.getIntent(performance.now());
-    this.party.tick(dt);
+    // Only drain while actually moving: holding Shift against a wall shouldn't tire you out.
+    const moving = !!(intent.move.x || intent.move.y) && this.active.body.velocity.length() > 5;
+    this.sprinting = this.party.tick(dt, intent.sprint && moving);
     const swap = SWAP_ACTIONS.find((a) => intent.pressed.has(a));
     if (swap) this.trySwap(swap);
 
     const s = this.active;
-    const p = this.moveParams(this.party.active);
+    const p = this.moveParams(this.party.active, this.sprinting);
     const v = stepVelocity(s.body.velocity, intent.move, dt, p);
     const b = s.body;
     const nudge = cornerNudge({ x: b.x, y: b.y, w: b.width, h: b.height }, intent.move, b.blocked, this.solid);
@@ -161,16 +171,27 @@ export class LevelScene extends Phaser.Scene {
     this.facingDot.setVisible(!sprite).setPosition(s.x + this.facing.x * 5, s.y - 14 + this.facing.y * 5).setDepth(s.depth + 0.5);
     if (sprite) {
       const speed = s.body.velocity.length();
-      const max = this.moveParams(this.party.active).maxSpeed;
       const { row, flip } = sheetDir(this.dir);
       const run = `${sprite}/run-${row}`;
-      const running = speed > max * tuning.runAt && this.anims.exists(run);
+      const running = this.sprinting && this.anims.exists(run);
       const key = running ? run : `${sprite}/${speed > 5 ? 'walk' : 'idle'}-${row}`;
       s.setFlipX(flip).play(key, true);
-      // Playback follows speed, so feet don't slide while speeding up or slowing down. Full rate at max speed for the run,
-      // at the run threshold for the walk (a character without a run keeps speeding its walk up past it).
-      s.anims.timeScale = speed > 5 ? Phaser.Math.Clamp((speed / (running ? max : max * tuning.runAt)) * tuning.animSpeed, 0.3, 2) : 1;
+      // Playback follows speed, so feet don't slide while speeding up or slowing down. Full rate at sprint speed for the
+      // run and at walk speed for the walk (a character without a run plays its walk faster while sprinting).
+      const full = this.moveParams(this.party.active, running).maxSpeed;
+      s.anims.timeScale = speed > 5 ? Phaser.Math.Clamp((speed / full) * tuning.animSpeed, 0.3, 2) : 1;
     }
-    this.rig.update(s.body.velocity, this.moveParams(this.party.active).maxSpeed, delta / 1000);
+    this.rig.update(s.body.velocity, this.moveParams(this.party.active, this.sprinting).maxSpeed, delta / 1000);
+    this.drawStamina(s);
+  }
+
+  /** A thin bar under the active character's feet, hidden while full. Red while winded (art-style palette colors). */
+  private drawStamina(s: CharSprite) {
+    const st = this.party.stamina[this.party.activeIndex];
+    const g = this.staminaBar.clear();
+    if (st.value >= 1) return;
+    const w = 14, x = Math.round(s.x - w / 2), y = Math.round(s.y + 2);
+    g.fillStyle(0x241520).fillRect(x - 1, y - 1, w + 2, 4);
+    g.fillStyle(st.winded ? 0xb4443a : 0xf2a846).fillRect(x, y, Math.round(w * st.value), 2);
   }
 }
