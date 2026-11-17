@@ -33,6 +33,19 @@ test('clear releases everything (window lost focus)', () => {
   const c = new LocalController();
   c.keyDown('KeyW', false, 0);
   c.keyDown('KeyE', false, 0);
+  c.keyDown('ShiftLeft', true, 0);
   c.clear();
-  expect(c.getIntent(0)).toEqual({ move: { x: 0, y: 0 }, pressed: new Set() });
+  expect(c.getIntent(0)).toEqual({ move: { x: 0, y: 0 }, sprint: false, pressed: new Set() });
+});
+
+test('sprint is on while either Shift key is held', () => {
+  const c = new LocalController();
+  expect(c.getIntent(0).sprint).toBe(false);
+  c.keyDown('ShiftLeft', true, 0);
+  expect(c.getIntent(0).sprint).toBe(true);
+  c.keyUp('ShiftLeft');
+  c.keyDown('ShiftRight', true, 0);
+  expect(c.getIntent(0).sprint).toBe(true);
+  c.keyUp('ShiftRight');
+  expect(c.getIntent(0).sprint).toBe(false);
 });

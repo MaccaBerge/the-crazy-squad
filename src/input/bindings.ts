@@ -9,6 +9,9 @@ export const MOVE_KEYS = {
   right: ['KeyD', 'ArrowRight'],
 } as const;
 
+/** Held, not pressed: sprinting lasts while one of these is down. */
+export const SPRINT_KEYS = ['ShiftLeft', 'ShiftRight'];
+
 export const ACTION_KEYS: Record<Action, string[]> = {
   attack: ['KeyJ', 'Space'],
   ability1: ['KeyK'],
