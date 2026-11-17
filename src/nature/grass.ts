@@ -36,16 +36,22 @@ export const poseFor = (lean: number, flex: number, w: number, push = 0) =>
   Math.max(-MAX_POSE, Math.min(MAX_POSE, Math.round(lean + w * flex * MAX_POSE + push)));
 
 const FLAT = 0.35; // inside this share of a force's radius, blades are flattened
+// Around a body, out to AURA times its radius, blades bend gently away (up to AURA_POSES), so a body in a field has presence.
+export const AURA = 2.2;
+const AURA_POSES = 1.2;
 
 /**
- * How many poses a force pushes a blade rooted `dx`, `dy` px from its centre: away from the centre, more the closer
- * it is, and flat under the feet. Strong enough to beat the wind. 0 outside the force.
+ * How many poses a force pushes a blade rooted `dx`, `dy` px from its centre, away from the centre:
+ * flat under the feet (strong enough to beat the wind), easing off to the force's edge, then a gentle bend out to AURA.
  */
 export function pushFor(dx: number, dy: number, f: Pick<Force, 'rx' | 'ry'>) {
   const d = Math.hypot(dx / f.rx, dy / f.ry);
-  if (d >= 1) return 0;
-  const strength = d < FLAT ? 1 : (1 - d) / (1 - FLAT);
-  return (dx < 0 ? -1 : 1) * strength * (MAX_POSE + 1);
+  if (d >= AURA) return 0;
+  const poses =
+    d < FLAT ? MAX_POSE + 1
+    : d < 1 ? AURA_POSES + ((1 - d) / (1 - FLAT)) * (MAX_POSE + 1 - AURA_POSES)
+    : (AURA_POSES * (AURA - d)) / (AURA - 1);
+  return (dx < 0 ? -1 : 1) * poses;
 }
 
 const STIFFNESS = 220; // spring-back pull
@@ -202,8 +208,8 @@ export class Grass {
   private applyForces(forces: readonly Force[], dt: number) {
     for (const i of this.active) this.target[i] = 0;
     for (const f of forces)
-      for (let row = Math.floor((f.y - f.ry) / CHUNK); row <= Math.floor((f.y + f.ry) / CHUNK); row++)
-        for (let col = Math.floor((f.x - f.rx) / CHUNK); col <= Math.floor((f.x + f.rx) / CHUNK); col++)
+      for (let row = Math.floor((f.y - f.ry * AURA) / CHUNK); row <= Math.floor((f.y + f.ry * AURA) / CHUNK); row++)
+        for (let col = Math.floor((f.x - f.rx * AURA) / CHUNK); col <= Math.floor((f.x + f.rx * AURA) / CHUNK); col++)
           for (const i of this.chunks.get(row * this.cols + col) ?? []) {
             const p = pushFor(this.blades[i].x - f.x, this.blades[i].y - f.y, f);
             if (!p) continue;
