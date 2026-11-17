@@ -1,4 +1,4 @@
-/** Dev panel with one slider per value; edits `values` in place. Toggle with the T key. */
+/** Dev panel with one slider per value; edits `values` in place. Toggle with the T key. Returns `sync`, to redraw the sliders after changing `values` from outside. */
 export function tuningPanel<T extends Record<string, number>>(
   values: T,
   ranges: { [K in keyof T]: [min: number, max: number, step: number] },
@@ -32,4 +32,5 @@ export function tuningPanel<T extends Record<string, number>>(
   addEventListener('keydown', (e) => {
     if (e.code === 'KeyT') panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
   });
+  return { panel, sync: () => rows.forEach((sync) => sync()) };
 }

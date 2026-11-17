@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser';
 import { HudScene } from './scenes/HudScene';
 import { LevelScene, tuning } from './scenes/LevelScene';
+import { WEATHER } from './nature/weather';
 import { tuningPanel } from './tuning';
 
 // The shorter screen side always shows VIEW px of the world; the longer side shows more,
@@ -25,7 +26,7 @@ const game = new Phaser.Game({
 });
 addEventListener('resize', () => game.scale.setGameSize(...viewSize()));
 
-tuningPanel(tuning, {
+const { panel, sync } = tuningPanel(tuning, {
   walkSpeed: [20, 300, 5],
   accel: [100, 6000, 100],
   decel: [100, 6000, 100],
@@ -40,4 +41,18 @@ tuningPanel(tuning, {
   exhaustTime: [0, 5, 0.1],
   exhaustSlow: [0.2, 1, 0.05],
   animSpeed: [0.25, 3, 0.05],
+  windBase: [0, 1, 0.05],
+  windGust: [0, 1, 0.05],
+  gustEvery: [1, 20, 0.5],
+  windDir: [0, 359, 5],
 });
+
+// Weather preset switch: loads a preset's values into the wind sliders.
+const preset = document.createElement('select');
+preset.append(new Option('weather preset…', ''), ...Object.keys(WEATHER).map((name) => new Option(name)));
+preset.onchange = () => {
+  if (preset.value) Object.assign(tuning, WEATHER[preset.value as keyof typeof WEATHER]);
+  sync();
+  preset.blur();
+};
+panel.append(preset);

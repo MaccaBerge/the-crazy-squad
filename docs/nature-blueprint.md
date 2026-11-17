@@ -40,15 +40,13 @@ A level's weather is a property on the map in Tiled: `weather = "sunny"`. Preset
 | `overcast` | medium | regular | slightly darker, cool tint | – |
 | `storm` | high | frequent, strong | dark, cool tint | rain (later) |
 
-A preset is plain data:
+A preset is plain data, in `src/nature/weather.ts`:
 
 ```ts
-interface Weather {
-  wind: { base: number; gust: number; gustEvery: number; direction: number };
-  tint: number;      // multiplied over the scene, 0xffffff = none
-  darkness: number;  // 0–1
-}
+interface WindParams { windBase: number; windGust: number; gustEvery: number; windDir: number }
 ```
+
+The light tint and darkness get added to presets in build step 9.
 
 Rain, falling leaves and lightning are extras for later. The tint and darkness use one camera-wide colour multiply, so the palette rule still holds for the art itself.
 
@@ -59,12 +57,14 @@ Rain, falling leaves and lightning are extras for later. The tint and darkness u
 One function, used by everything that sways:
 
 ```ts
-wind(x: number, y: number, t: number): number   // about -1..1, + is the wind's direction
+wind(x, y, t, params): number   // -1..1, + leans things in the wind's direction
+gust(x, y, t, params): number   // 0..1, how much of a gust is passing right now
 ```
 
 - **Base sway:** two or three sines with different speeds and wavelengths, offset by `x` (and a bit of `y`), so the sway rolls across a field as a wave instead of everything moving together. DaFluffyPotato's version is `sin(t/60 + x/100)`; ours sums a few of those.
 - **Gusts:** wider, stronger bumps that travel across the level in the wind's direction every `gustEvery` seconds. That's what makes a field ripple.
-- **Scaled by the weather preset:** `base` and `gust` from section 2.
+- **Scaled by the weather preset:** `windBase` and `windGust` from section 2.
+- **Debug view:** V draws one arrow per tile (orange where a gust is passing). The T panel has the wind sliders and a preset switch.
 - **Cheap:** it's sampled per grass tile or per tree, not per blade.
 
 It lives in `src/nature/wind.ts` with a unit test (same input, same output; stays within range).
