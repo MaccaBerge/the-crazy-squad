@@ -6,7 +6,9 @@ How the world's tiles and objects are drawn so that they belong together and wit
 
 - **Setting:** the route to Jonas's cat starts in a Norwegian neighbourhood (backyards, wooden houses and fences, gardens, roads) and gets wilder on the way: forest edge, forest, fields, water.
 - **Season:** late summer. Green is the base; autumn colours are accents (a few orange or red trees, fallen leaves, berries).
-- **Ground:** rich and detailed, but calm in value, so the characters still stand out (rule 4).
+- **Colour:** warm characters and props in a cool, lush nature (blue-violet shade, teal and fern greens), like the forest reference. See the warm/cool rule in [art-style.md](art-style.md).
+- **Ground:** calm and quiet, so the characters stand out (rule 4). Life comes from separate systems drawn on top, not from busy tiles: code-drawn grass that moves with the wind and with anything walking through it, and trees that sway. Tiles may still have static grass.
+- **Trees:** big and lush, built from leaf bundles (Slynyrd's Pixelblog 44): one leaf shape, bundles shaded like spheres, layered by light, each bundle swaying in the wind.
 - **Objects:** a tinted outline around the outer silhouette only.
 
 ## Rules
@@ -50,13 +52,13 @@ Which ramps each material uses. Ground tiles use only the middle steps (rule 4).
 
 | Material | Ramps | Notes |
 |---|---|---|
-| Grass | leaf (middle steps) | Tufts and blades as small clusters; sparse flowers in berry or autumn |
+| Grass (tiles) | leaf, fern or moss (middle steps) | Static tufts as small clusters; sparse flowers in berry, violet or autumn. Moving grass is its own system |
 | Dirt and paths | sand, wood for the darker patches | Pebbles in stone |
 | Gravel and road | stone, sand | Light on top-left edges of the bigger stones |
 | Wood (fences, houses, crates) | wood | Planks shown by shading, not lines; the light top edge of each board |
 | Painted wood (house walls) | berry or autumn for the classic red or yellow Norwegian house, wood for the trim | Keep it one or two steps from the ramp's lightest |
-| Stone and rock | stone | Purple-grey, never neutral grey; moss in leaf |
-| Leaves and tree tops | leaf; autumn for accent trees | Clumps lit top-left, a dark leaf tone under each clump |
+| Stone and rock | stone | Purple-grey, never neutral grey; moss in moss |
+| Leaves and tree tops | teal, fern, dusk for the shade; autumn for accent trees | Leaf bundles lit top-left, darker bundles behind, dusk in the deepest gaps |
 | Water | water | Lighter near the edges, a light ripple line; a sand or stone shore |
 | Metal (bins, signs, bikes) | stone, water for the shine | Small and rare |
 
