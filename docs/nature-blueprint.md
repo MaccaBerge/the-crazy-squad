@@ -133,7 +133,7 @@ A field can hold **tens of thousands of blades**, so:
 ### How it moves
 
 - **Leaf clumps** (DaFluffyPotato's foliage trick): when the level starts, each canopy is cut into clumps. The brightest leaf spots seed them, and the lit leaves around grow into each one (`src/nature/leafClumps.ts`). The darker leaves behind stay put; under each clump they become a single shade, so a moving clump uncovers shadow, not holes.
-- **Each clump moves as one piece** by whole pixels: with the wind where it sits (so gusts roll across the canopy), further near the top, up to `sway` px, plus a little rustle of its own that sometimes lifts it 1 px. Brighter clumps are drawn in front.
+- **Each clump moves as one piece** by whole pixels: with the wind where it sits (so gusts roll across the canopy), further near the top, up to `sway` px, plus a rustle of its own that grows with the wind (none in still air, sometimes lifting it 1 px in a storm). Brighter clumps are drawn in front.
 - We tried shifting pixel rows first; it looked like pixels shuffling along a line, not leaves moving.
 - Each tree has its own canvas texture, redrawn only when a clump moves. The lean is the sideways part of the wind, times a small per-tree stiffness so neighbours don't move in lockstep.
 

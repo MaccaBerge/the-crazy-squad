@@ -71,11 +71,13 @@ export function findClumps(px: ArrayLike<number>, w: number, h: number, swayFrom
     .sort((a, b) => a.lum - b.lum);
 }
 
-const FLUTTER = 0.7; // px: each clump's own rustle, even in still air
+const RUSTLE = 1.2; // px of each clump's own rustle at full wind; none in still air
 
-/** How far (whole px) clump number `k` moves when the wind at it is `lean` (-1..1): higher clumps further, never past `sway`. */
+/** How far (whole px) clump number `k` moves when the wind at it is `lean` (-1..1): higher clumps further, never past
+ * `sway`. The rustle grows with the wind too, so calm weather is still and a storm thrashes. */
 export function clumpOffset(c: Clump, k: number, lean: number, t: number, sway: number, swayFrom: number) {
   const height = Math.max(0, Math.min(1, (swayFrom - c.cy) / swayFrom));
-  const dx = lean * sway * (0.5 + 0.5 * height) + FLUTTER * Math.sin(t * 2.6 + k * 2.1);
-  return { dx: Math.round(Math.max(-sway, Math.min(sway, dx))), dy: Math.round(0.55 * Math.sin(t * 1.9 + k * 1.3)) };
+  const strength = Math.abs(lean);
+  const dx = lean * sway * (0.5 + 0.5 * height) + RUSTLE * strength * Math.sin(t * 2.6 + k * 2.1);
+  return { dx: Math.round(Math.max(-sway, Math.min(sway, dx))), dy: Math.round(0.8 * strength * Math.sin(t * 1.9 + k * 1.3)) };
 }

@@ -32,3 +32,14 @@ test('clumps never move further than the tree allows, and higher ones lean furth
     }
   expect(clumpOffset(at(0), 0, 1, 0, 3, 100).dx).toBeGreaterThanOrEqual(clumpOffset(at(90), 0, 1, 0, 3, 100).dx);
 });
+
+test('still air keeps every clump in place; strong wind moves them', () => {
+  const c = { pixels: [], cx: 0, cy: 10, lum: 0.5 };
+  for (let t = 0; t < 10; t += 0.37) for (let k = 0; k < 20; k++) {
+    const { dx, dy } = clumpOffset(c, k, 0, t, 3, 100);
+    expect(Math.abs(dx) + Math.abs(dy)).toBe(0); // -0 counts as still
+  }
+  let moved = 0;
+  for (let k = 0; k < 20; k++) if (clumpOffset(c, k, 0.9, 1, 3, 100).dx !== 0) moved++;
+  expect(moved).toBe(20);
+});
