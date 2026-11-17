@@ -1,5 +1,7 @@
 import * as Phaser from 'phaser';
+import { type Dir, sheetDir, snapDir } from '../art/facing';
 import { characterTexture, FRAME, makePlaceholderTextures } from '../art/placeholders';
+import { createAnims, preloadSprites } from '../art/sprites';
 import { CameraRig } from '../camera/cameraRig';
 import { SQUAD } from '../characters';
 import type { CharacterDef } from '../characters/types';
@@ -36,6 +38,7 @@ export class LevelScene extends Phaser.Scene {
   private rig!: CameraRig;
   private solid!: SolidAt;
   private facing = { x: 0, y: 1 };
+  private dir: Dir = 'down';
   private facingDot!: Phaser.GameObjects.Image;
 
   constructor() {
@@ -48,12 +51,14 @@ export class LevelScene extends Phaser.Scene {
 
   preload() {
     preloadMap(this, MAP);
+    preloadSprites(this, SQUAD);
   }
 
   create() {
     const { map, colliders } = loadMap(this, MAP);
     this.solid = (tx, ty) => colliders.some((l) => l.getTileAt(tx, ty)?.collides);
     makePlaceholderTextures(this, SQUAD);
+    createAnims(this, SQUAD);
 
     let spawn = { x: map.widthInPixels / 2, y: map.heightInPixels / 2 };
     spawnEntities(map, { PlayerSpawn: (o) => (spawn = { x: o.x ?? spawn.x, y: o.y ?? spawn.y }) });
@@ -115,6 +120,7 @@ export class LevelScene extends Phaser.Scene {
       const len = Math.hypot(intent.move.x, intent.move.y);
       this.facing = { x: intent.move.x / len, y: intent.move.y / len };
     }
+    this.dir = snapDir(this.dir, intent.move);
   }
 
   private trySwap(action: SwapAction) {
@@ -149,7 +155,14 @@ export class LevelScene extends Phaser.Scene {
   update(_time: number, delta: number) {
     const s = this.active;
     s.setDepth(DEPTH.actors + s.y); // y-sort by feet
-    this.facingDot.setPosition(s.x + this.facing.x * 5, s.y - 10 + this.facing.y * 5).setDepth(s.depth + 0.5);
+    const { sprite } = this.party.active;
+    // Placeholders show facing with a dot; real art shows it with the animation.
+    this.facingDot.setVisible(!sprite).setPosition(s.x + this.facing.x * 5, s.y - 14 + this.facing.y * 5).setDepth(s.depth + 0.5);
+    if (sprite) {
+      const moving = s.body.velocity.length() > 5;
+      const { row, flip } = sheetDir(this.dir);
+      s.setFlipX(flip).play(`${sprite}/${moving ? 'walk' : 'idle'}-${row}`, true);
+    }
     this.rig.update(s.body.velocity, this.moveParams(this.party.active).maxSpeed, delta / 1000);
   }
 }
