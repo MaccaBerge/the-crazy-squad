@@ -28,7 +28,7 @@ How a person controls the squad, how key presses and controller buttons become a
 - **Only the character you're playing is on the map.** The other three are "off stage".
 - **Swapping replaces the character in place.** The new character appears where the old one stood, facing the same way, with a short swap effect (a puff of smoke and a sound).
 - **Swap cooldown:** after any swap, swapping is locked for a while, about **4 s** to start and tunable in the T panel. This makes *who you're playing right now* a real decision instead of something you flick between every second. The HUD shows the cooldown.
-- **Controls:** **Tab** cycles to the next character, **1–4** jump straight to Marcus, Kristian, Christian or Jonas, and **LB / RB** cycle on a controller.
+- **Controls:** **E** cycles to the next character (**Q** back), **1–4** jump straight to Marcus, Kristian, Christian or Jonas, and **LB / RB** cycle on a controller.
 - **You can't swap to a downed character.** If the new character's body doesn't fit where you're standing, for example a wider character in a tight gap, the swap is refused with a "no room" sound. Being pushed to the nearest free spot is the alternative if refusing feels bad.
 - **A short safety window:** the incoming character is invulnerable for about 0.3 s, so swapping into a crowd of dogs isn't an instant hit.
 - **Every character keeps their own state** while off stage: health, ability cooldowns and anything they carry. **Ability cooldowns keep recharging off stage**, so swapping to use someone whose ability is ready is part of the strategy.
@@ -134,8 +134,8 @@ Bindings are data in `src/input/bindings.ts`. They could be made rebindable late
 | attack | J or Space | A / Cross |
 | ability1 | K | X / Square |
 | ability2 | L | Y / Triangle |
-| interact | E | B / Circle |
-| swapNext / swapPrev | Tab / Shift+Tab | RB / LB |
+| interact | F | B / Circle |
+| swapNext / swapPrev | E / Q | RB / LB |
 | swapTo1–4 | 1, 2, 3, 4 | (none) |
 | pause | Esc / P | Start |
 | tuning panel (dev) | T | (none) |
