@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser';
 import { type MapObject, props } from '../world/spawner';
 import { TILE } from '../world/constants';
+import { type BladeKind, CELL, drawShape, MAX_POSE, pickShape, SHAPES } from './bladeShapes';
 import type { Force } from './forces';
 import type { WindParams } from './weather';
 import { wind } from './wind';
@@ -9,27 +10,16 @@ import { wind } from './wind';
 // Bending switches the blade's frame between pre-drawn lean poses, so blades stay pixel perfect.
 
 const TEXTURE = 'grass-blades';
-const CELL = { w: 8, h: 16 };
-export const MAX_POSE = 3; // poses are -3..3: three steps of lean each way
 const CHUNK = 16; // px; wind is sampled once per chunk
 // px; blades are drawn in horizontal strips, each at the depth of its top row, so characters sort between them
 // (a blade up to STRIP-1 px below the feet can still draw behind them).
 const STRIP = 4;
 const VIEW_MARGIN = 8; // px; blades just outside the view still update, so leaning ones don't pop at the edge
 
-/** Placeholder blade types: height and ramp tones from root to tip. Real blade art replaces these in step 5. */
-// Tones are from the cool ramps in art/palette.mjs (fern, moss, teal).
-const TYPES = [
-  { h: 6, tones: [0x3f7a2e, 0x629f54, 0xa1b875] },
-  { h: 10, tones: [0x1d5217, 0x3f7a2e, 0x629f54] },
-  { h: 8, tones: [0x6b6324, 0x818634, 0xb3b85a] },
-  { h: 12, tones: [0x27596c, 0x368578, 0x549e9f] },
-];
+export { MAX_POSE } from './bladeShapes';
 
+/** A blade's root position, its shape (index in SHAPES), resting lean in poses, and how much the wind moves it. */
 export interface Blade { x: number; y: number; type: number; lean: number; flex: number }
-
-/** Sideways offset (px) of row `r` (0 = root) of a blade `h` tall, in lean pose `pose`: the tip moves most. */
-export const bendOffset = (pose: number, r: number, h: number) => Math.round(pose * 1.3 * (r / (h - 1)) ** 2);
 
 /** The pose a blade takes in a sideways wind of `w` (-1..1), plus `push` poses from bodies moving through it. */
 export const poseFor = (lean: number, flex: number, w: number, push = 0) =>
@@ -76,21 +66,31 @@ export function seeded(seed: number) {
   };
 }
 
+export const DEFAULT_FLOWERS = 0.04; // share of a grass area's blades that are flowers
+const REED_SHARE = 0.7; // share of a reed area's blades that are reeds; the rest is grass
+
+/** What grows in an area: grass with some flowers, or reeds with some grass. */
+export interface Mix { reeds?: boolean; flowers?: number }
+
 /** `count` blades scattered evenly at random over a rectangle, sorted back to front. */
 export function scatter(
   area: { x: number; y: number; w: number; h: number },
   count: number,
   seed: number,
   inside: (x: number, y: number) => boolean = () => true,
+  { reeds = false, flowers = DEFAULT_FLOWERS }: Mix = {},
 ): Blade[] {
   const rnd = seeded(seed);
-  const blades = Array.from({ length: count }, () => ({
-    x: Math.floor(area.x + rnd() * area.w),
-    y: Math.floor(area.y + rnd() * area.h),
-    type: Math.floor(rnd() * TYPES.length),
-    lean: (rnd() - 0.5) * 1.2,
-    flex: 0.7 + rnd() * 0.5,
-  }));
+  const blades = Array.from({ length: count }, () => {
+    const kind: BladeKind = reeds ? (rnd() < REED_SHARE ? 'reed' : 'grass') : rnd() < flowers ? 'flower' : 'grass';
+    return {
+      x: Math.floor(area.x + rnd() * area.w),
+      y: Math.floor(area.y + rnd() * area.h),
+      type: pickShape(kind, rnd()),
+      lean: (rnd() - 0.5) * 1.2,
+      flex: kind === 'reed' ? 0.5 + rnd() * 0.3 : 0.7 + rnd() * 0.5, // reeds are stiffer
+    };
+  });
   return blades.filter((b) => inside(b.x, b.y)).sort((a, b) => a.y - b.y);
 }
 
@@ -108,39 +108,40 @@ function insidePolygon(pts: { x: number; y: number }[], x: number, y: number) {
 
 /**
  * Blades for every area on a map's `Grass` object layer (rectangles or polygons), sorted back to front.
- * Optional properties: `density` (blades per tile) and `seed` (defaults to the object's id, so each area differs).
+ * Optional properties: `density` (blades per tile), `seed` (defaults to the object's id, so each area differs),
+ * `flowers` (share of blades that are flowers) and `kind` ("grass", the default, or "reeds").
  */
 export function bladesFromMap(areas: MapObject[]): Blade[] {
   return areas
     .flatMap((o) => {
-      const { density = DEFAULT_DENSITY, seed = o.id } = props(o) as { density?: number; seed?: number };
+      const { density = DEFAULT_DENSITY, seed = o.id, flowers, kind } = props(o) as { density?: number; seed?: number; flowers?: number; kind?: string };
       const x = o.x ?? 0, y = o.y ?? 0;
       const poly = o.polygon?.map((p) => ({ x: x + p.x, y: y + p.y }));
       const xs = poly?.map((p) => p.x) ?? [x, x + (o.width ?? 0)];
       const ys = poly?.map((p) => p.y) ?? [y, y + (o.height ?? 0)];
       const box = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
       const count = Math.round(((box.w * box.h) / TILE ** 2) * density);
-      return scatter(box, count, seed, poly && ((px, py) => insidePolygon(poly, px + 0.5, py + 0.5)));
+      const inside = poly && ((px: number, py: number) => insidePolygon(poly, px + 0.5, py + 0.5));
+      return scatter(box, count, seed, inside, { reeds: kind === 'reeds', flowers });
     })
     .sort((a, b) => a.y - b.y);
 }
 
-/** Draws every blade type in every pose onto one canvas texture: a row per type, a column per pose. */
+/** Draws every shape in every pose onto one canvas texture: a row per shape, a column per pose. */
 function makeTexture(scene: Phaser.Scene) {
   if (scene.textures.exists(TEXTURE)) return;
   const poses = MAX_POSE * 2 + 1;
-  const tex = scene.textures.createCanvas(TEXTURE, 64, 64)!; // power of two, so frames don't bleed into each other
+  // Power-of-two size, so frames don't bleed into each other.
+  const size = (n: number) => 2 ** Math.ceil(Math.log2(n));
+  const tex = scene.textures.createCanvas(TEXTURE, size(poses * CELL.w), size(SHAPES.length * CELL.h))!;
   const ctx = tex.getContext();
-  TYPES.forEach(({ h, tones }, type) =>
+  SHAPES.forEach((shape, type) =>
     Array.from({ length: poses }, (_, i) => {
       const pose = i - MAX_POSE;
       const x0 = i * CELL.w, y0 = type * CELL.h;
-      for (let r = 0; r < h; r++) {
-        // Leaning far shows the blade's shaded side: one tone darker.
-        const tone = Math.max(0, Math.min(tones.length - 1, Math.floor((r / h) * tones.length)) - (Math.abs(pose) >= 2 ? 1 : 0));
-        ctx.fillStyle = `#${tones[tone].toString(16).padStart(6, '0')}`;
-        const x = Math.max(0, Math.min(CELL.w - 1, CELL.w / 2 + bendOffset(pose, r, h)));
-        ctx.fillRect(x0 + x, y0 + CELL.h - 1 - r, 1, 1);
+      for (const p of drawShape(shape, pose)) {
+        ctx.fillStyle = `#${p.color.toString(16).padStart(6, '0')}`;
+        ctx.fillRect(x0 + CELL.w / 2 + p.x, y0 + CELL.h - 1 - p.y, 1, 1);
       }
       tex.add(`${type}:${pose}`, 0, x0, y0, CELL.w, CELL.h);
     }),
@@ -187,7 +188,7 @@ export class Grass {
       start = end;
     }
     const idx = (this.layers[0]?.frameDataIndices ?? {}) as Record<string, number>;
-    this.frames = TYPES.map((_, type) => Array.from({ length: MAX_POSE * 2 + 1 }, (_, i) => idx[`${type}:${i - MAX_POSE}`]));
+    this.frames = SHAPES.map((_, type) => Array.from({ length: MAX_POSE * 2 + 1 }, (_, i) => idx[`${type}:${i - MAX_POSE}`]));
     this.pose = new Int8Array(blades.length);
     this.push = new Float32Array(blades.length);
     this.vel = new Float32Array(blades.length);

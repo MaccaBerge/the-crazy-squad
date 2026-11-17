@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
-import { AURA, bladesFromMap, bendOffset, MAX_POSE, poseFor, pushFor, scatter, springStep } from './grass';
+import { bendOffset, CELL, drawShape, pickShape, SHAPES } from './bladeShapes';
+import { AURA, bladesFromMap, MAX_POSE, poseFor, pushFor, scatter, springStep } from './grass';
 
 test('the same seed scatters the same grass, inside the area, back to front', () => {
   const area = { x: 16, y: 32, w: 100, h: 50 };
@@ -72,4 +73,39 @@ test('grass areas from a map fill rectangles and polygons at their density', () 
   expect(inTri.length).toBeLessThan(350);
   expect(inTri.every((b) => b.x - 320 + b.y <= 160)).toBe(true);
   expect(blades.every((b, i) => i === 0 || blades[i - 1].y <= b.y)).toBe(true);
+});
+
+test.each(SHAPES.map((s) => [s.name, s] as const))('%s fits its cell and stays connected in every pose', (_name, shape) => {
+  for (let pose = -MAX_POSE; pose <= MAX_POSE; pose++) {
+    const px = drawShape(shape, pose);
+    for (const p of px) {
+      expect(p.x + CELL.w / 2).toBeGreaterThanOrEqual(0);
+      expect(p.x + CELL.w / 2).toBeLessThan(CELL.w);
+      expect(p.y).toBeLessThan(CELL.h - 1);
+    }
+    // Every pixel above the root row touches one in the row below (diagonals count), so bending never breaks a blade.
+    for (const p of px.filter((p) => p.y > 0))
+      expect(px.some((q) => q.y === p.y - 1 && Math.abs(q.x - p.x) <= 1) || px.some((q) => q.y === p.y && Math.abs(q.x - p.x) === 1)).toBe(true);
+  }
+});
+
+test('shapes are picked by kind and weight', () => {
+  for (const kind of ['grass', 'flower', 'reed'] as const)
+    for (let r = 0; r < 1; r += 0.05) expect(SHAPES[pickShape(kind, r)].kind).toBe(kind);
+  const counts = new Map<number, number>();
+  for (let r = 0; r < 1; r += 0.001) counts.set(pickShape('grass', r), (counts.get(pickShape('grass', r)) ?? 0) + 1);
+  const short = SHAPES.findIndex((s) => s.name === 'fern short'), teal = SHAPES.findIndex((s) => s.name === 'teal tall');
+  expect(counts.get(short)!).toBeGreaterThan(counts.get(teal)! * 3);
+});
+
+test('areas mix in flowers, and reed areas are mostly reeds', () => {
+  const area = { x: 0, y: 0, w: 160, h: 160 };
+  const kinds = (b: { type: number }[]) => b.map((x) => SHAPES[x.type].kind);
+  const grass = kinds(scatter(area, 2000, 1, undefined, { flowers: 0.1 }));
+  expect(grass.filter((k) => k === 'flower').length).toBeGreaterThan(140);
+  expect(grass.filter((k) => k === 'flower').length).toBeLessThan(260);
+  expect(grass).not.toContain('reed');
+  const reeds = kinds(scatter(area, 2000, 1, undefined, { reeds: true }));
+  expect(reeds.filter((k) => k === 'reed').length).toBeGreaterThan(1300);
+  expect(reeds).not.toContain('flower');
 });
