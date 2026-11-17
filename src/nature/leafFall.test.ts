@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest';
 import { FADE, LIE, type Leaf, leafDrawn, shedRate, stepLeaf, swing } from './leafFall';
-import { WEATHER } from './weather';
+import { type WindParams, WEATHER } from './weather';
 
-const drop = (weather = WEATHER.sunny) => {
+const drop = (weather: WindParams = WEATHER.sunny) => {
   const l: Leaf = { x: 0, y: 0, z: 60, phase: 0, age: 0 };
   const xs: number[] = [];
   let t = 0;
