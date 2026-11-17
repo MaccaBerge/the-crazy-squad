@@ -30,6 +30,16 @@ function cut({ w, h, px }, footFrom, footRow) {
   return out;
 }
 
+/** A 32×32 frame breathing out: rows above the waist move down 1 px, the legs stay put. */
+function bob(px) {
+  const rows = [...Array(S).keys()].filter((y) => px.subarray(y * S * 4, (y + 1) * S * 4).some((v, k) => k % 4 === 3 && v));
+  const top = rows[0], waist = top + Math.round((rows.at(-1) - top) * 0.55), out = px.slice();
+  for (let y = waist; y > top; y--) out.set(px.subarray((y - 1) * S * 4, y * S * 4), y * S * 4);
+  out.fill(0, top * S * 4, (top + 1) * S * 4);
+  if (out.subarray((waist + 1) * S * 4).some((v, k) => v !== px[(waist + 1) * S * 4 + k])) throw new Error('bob moved the legs');
+  return out;
+}
+
 for (const name of fs.readdirSync(src).filter((n) => fs.statSync(path.join(src, n)).isDirectory())) {
   const dir = path.join(src, name);
   const rotations = ORDER.map((d) => decode(fs.readFileSync(path.join(dir, 'rotations', `${d}.png`))));
@@ -37,6 +47,13 @@ for (const name of fs.readdirSync(src).filter((n) => fs.statSync(path.join(src, 
   const footRow = feet(rotations);
   const frames = rotations.map((r) => r.px), anims = {};
   const animDir = path.join(dir, 'animations');
+  if (!fs.existsSync(path.join(animDir, 'idle'))) {
+    // No PixelLab idle (theirs swung the arms out): breathe in code, 4 frames still + 4 with the upper body 1 px down.
+    for (const d of ['south', 'south-east', 'east', 'north-east', 'north']) {
+      const still = rotations[ORDER.indexOf(d)].px, i = frames.push(still) - 1, j = frames.push(bob(still)) - 1;
+      anims[`idle-${d}`] = [i, i, i, i, j, j, j, j];
+    }
+  }
   for (const anim of fs.existsSync(animDir) ? fs.readdirSync(animDir).sort() : []) {
     for (const d of fs.readdirSync(path.join(animDir, anim)).sort()) {
       const fd = path.join(animDir, anim, d);
