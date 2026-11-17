@@ -47,6 +47,8 @@ export class LevelScene extends Phaser.Scene {
   private dir: Dir = 'down';
   private sprinting = false;
   private staminaBar!: Phaser.GameObjects.Graphics;
+  private sweat: { x: number; y: number; vx: number; vy: number; age: number }[] = [];
+  private nextSweat = 0;
   private facingDot!: Phaser.GameObjects.Image;
 
   constructor() {
@@ -120,6 +122,8 @@ export class LevelScene extends Phaser.Scene {
 
     const s = this.active;
     const p = this.moveParams(this.party.active, this.sprinting);
+    // Exhausted (bar just ran dry): walk slower. Animation speed still compares to the normal walk, so the legs look heavy.
+    p.maxSpeed *= this.party.stamina[this.party.activeIndex].speedFactor;
     const v = stepVelocity(s.body.velocity, intent.move, dt, p);
     const b = s.body;
     const nudge = cornerNudge({ x: b.x, y: b.y, w: b.width, h: b.height }, intent.move, b.blocked, this.solid);
@@ -182,16 +186,36 @@ export class LevelScene extends Phaser.Scene {
       s.anims.timeScale = speed > 5 ? Phaser.Math.Clamp((speed / full) * tuning.animSpeed, 0.3, 2) : 1;
     }
     this.rig.update(s.body.velocity, this.moveParams(this.party.active, this.sprinting).maxSpeed, delta / 1000);
-    this.drawStamina(s);
+    this.drawStamina(s, delta / 1000);
   }
 
-  /** A thin bar under the active character's feet, hidden while full. Red while winded (art-style palette colors). */
-  private drawStamina(s: CharSprite) {
+  /** A thin bar under the active character's feet, hidden while full. Red while winded, flashing while exhausted. */
+  private drawStamina(s: CharSprite, dt: number) {
     const st = this.party.stamina[this.party.activeIndex];
     const g = this.staminaBar.clear();
+    this.drawSweat(g, s, st.exhausted, dt);
     if (st.value >= 1) return;
     const w = 14, x = Math.round(s.x - w / 2), y = Math.round(s.y + 2);
-    g.fillStyle(0x241520).fillRect(x - 1, y - 1, w + 2, 4);
+    const flashOff = st.exhausted && Math.floor(this.time.now / 150) % 2 === 1;
+    g.fillStyle(flashOff ? 0x7a2a36 : 0x241520).fillRect(x - 1, y - 1, w + 2, 4);
     g.fillStyle(st.winded ? 0xb4443a : 0xf2a846).fillRect(x, y, Math.round(w * st.value), 2);
   }
+
+  /** Sweat drops popping off the head while exhausted: 1×2 px, light water blues from the palette. */
+  private drawSweat(g: Phaser.GameObjects.Graphics, s: CharSprite, exhausted: boolean, dt: number) {
+    if (exhausted && this.time.now >= this.nextSweat) {
+      const side = Math.random() < 0.5 ? -1 : 1;
+      this.sweat.push({ x: s.x + side * 5, y: s.y - 26, vx: side * (10 + Math.random() * 10), vy: -30, age: 0 });
+      this.nextSweat = this.time.now + 250;
+    }
+    this.sweat = this.sweat.filter((d) => (d.age += dt) < 0.45);
+    for (const d of this.sweat) {
+      d.vy += 160 * dt;
+      d.x += d.vx * dt;
+      d.y += d.vy * dt;
+      g.fillStyle(0x8edcf2).fillRect(Math.round(d.x), Math.round(d.y), 1, 2);
+      g.fillStyle(0xe6faf6).fillRect(Math.round(d.x), Math.round(d.y), 1, 1);
+    }
+  }
+
 }

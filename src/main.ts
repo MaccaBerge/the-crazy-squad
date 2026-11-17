@@ -37,5 +37,7 @@ tuningPanel(tuning, {
   regenTime: [0.5, 10, 0.25],
   regenDelay: [0, 3, 0.1],
   recoverAt: [0, 1, 0.05],
+  exhaustTime: [0, 5, 0.1],
+  exhaustSlow: [0.2, 1, 0.05],
   animSpeed: [0.25, 3, 0.05],
 });
