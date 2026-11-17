@@ -1,6 +1,6 @@
 // Builds every character into public/assets/sprites/<id>.png + <id>.anims.json (art blueprint §4).
 // Hand-typed: art/characters/<id>.mjs (Piskel-style route).
-// PixelLab: art/pixellab/<id>/rotations/<direction>.png and, once made, animations/walk/<direction>/frame_NNN.png
+// PixelLab: art/pixellab/<id>/rotations/<direction>.png and, once made, animations/<idle|walk|run>/<direction>/frame_NNN.png
 // (the layout of PixelLab's character ZIP). Every pixel must be a palette color, or the build fails.
 // `node art/build.mjs --preview <dir>` also writes 8× previews there for review.
 import fs from 'node:fs';
@@ -67,8 +67,9 @@ for (const id of fs.existsSync(plDir) ? fs.readdirSync(plDir) : []) {
     const ad = path.join(dir, 'animations', name, d);
     return fs.existsSync(ad) ? fs.readdirSync(ad).filter((f) => f.endsWith('.png')).sort().map((f) => frameOf(path.join(ad, f), own, stats)) : [];
   };
-  // Columns per row: the still, then each animation's frames in its own block. Missing animations are left out of anims.json.
-  const ANIMS = { walk: 10, run: 16 }; // base frame rates at full speed; the game scales them with velocity
+  // Columns per row: the still, then each animation's frames in its own block. Missing animations are left out of anims.json;
+  // without an idle animation, idle is the still.
+  const ANIMS = { idle: 4, walk: 10, run: 16 }; // frame rates; walk and run are at full speed, the game scales them with velocity
   const rows = Object.entries(ROWS).map(([row, d]) => ({ row, still: stills[d], ...Object.fromEntries(Object.keys(ANIMS).map((a) => [a, animOf(a, d)])) }));
   if (stats.snapped) console.log(`  ${id}: snapped ${stats.snapped} animation pixels onto its own colors`);
   const width = Object.fromEntries(Object.keys(ANIMS).map((a) => [a, Math.max(...rows.map((r) => r[a].length))]));
