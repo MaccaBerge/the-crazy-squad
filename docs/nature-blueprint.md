@@ -100,7 +100,7 @@ It lives in `src/nature/wind.ts` with unit tests:
 ### Where grass grows
 
 - In Tiled, a **`Grass` object layer** holds rectangles or polygons: grass areas. Properties: `density` (blades per tile), `types` (which blades), `height` (short or tall), `seed`.
-- Areas are rectangles or polygons. `density` defaults to 6 blades per tile, `seed` defaults to the object's id, `flowers` sets the share of flowers (default 0.04), and `kind: "reeds"` makes a reed bed (70% reeds, the rest grass).
+- Areas are rectangles or polygons. `density` defaults to 6 blades per tile, `seed` defaults to the object's id, `flowers` sets the share of flowers (default 0.04), `kind: "reeds"` makes a reed bed (70% reeds, the rest grass), and `kind: "autumn"` grows autumn grass: dry olive, golden and rust blades and seed heads, with 15% still green.
 - The art is in `src/nature/bladeShapes.ts`: 6 grass blades, 3 flowers and 2 reeds, typed in as pixel rows on the cool ramps, with a weight for how often each is picked. Code bends them into the poses. The map test rejects ellipses, points and odd densities.
 - At level load, a **seeded scatter** fills each area with blades. Blades get a small random base lean and a random pose offset, so they don't all look alike.
 - Static grass painted on the ground tiles under them makes the area look full even where blades are sparse.
@@ -143,6 +143,9 @@ A field can hold **tens of thousands of blades**, so:
 
 ### How a tree is drawn
 
+- **Types:** big trees (spreading oak, gnarled), smaller ones (young oak, slender tree, small pine, autumn maple) and bushes (round, berry, flowering). Most trees should be the smaller ones, with only a few of the big two.
+- **Autumn versions:** `npm run art` builds `autumn-<name>.png` for the young oak, slender tree and bushes (`art/trees/autumn.mjs`). It swaps each green, teal and moss tone for the autumn tone at the same step, stopping short of the palest gold. A test checks the files are up to date. Together with the maple, autumn grass and leaf litter they make autumn corners.
+
 - **One PixelLab image per tree type** (`create_object_pro_flash`, 160×160, one direction, low top-down, the nature palette, a character sprite as style anchor). The images live in `public/assets/trees/<type>.png`; their PixelLab ids are in `art/trees/pixellab.json`.
 - **On the palette, no soft edges:** a test checks every tree image like the characters and tilesets.
 - **Per type, in `src/nature/treeTypes.ts`:** where the trunk meets the ground (`base`), the trunk hitbox (`block`), and which rows sway (`swayFrom`, `sway`).
@@ -164,7 +167,7 @@ A field can hold **tens of thousands of blades**, so:
 
 ### Falling leaves
 
-- **Who sheds:** every tree type has a `shed` rate in `TREE_TYPES`: leaves per second in a light breeze. Big trees shed more than small ones, and bushes will shed less still. A tree's `shed` property in Tiled (a float, 0–10) overrides its type's rate; the map test checks it.
+- **Who sheds:** every tree type has a `shed` rate in `TREE_TYPES`: leaves per second in a light breeze. Big trees shed more than small ones, bushes least, and autumn versions 1.5× their green ones. A tree's `shed` property in Tiled (a float, 0–10) overrides its type's rate; the map test checks it.
 - **Wind sets the pace:** the rate grows with the wind at the tree, from 0.3× in still air to 2× in full wind (`shedRate`).
 - **Where a leaf starts and lands:** it leaves from a random pixel of the canopy's leaf clumps, in that pixel's colour. It lands somewhere on the ground under the canopy.
 - **The fall** (`src/nature/leafFall.ts`):
@@ -173,6 +176,7 @@ A field can hold **tens of thousands of blades**, so:
   - it tumbles through three 4×3 poses (flat, tilted left, tilted right).
 - **On the ground:** it lies for 4 s, then fades over about a second.
 - **Cost:** a pool of at most 160 leaves keeps the cost fixed.
+- **Leaf litter:** autumn trees (types with `litter`) keep a carpet of fallen leaves under them, already there when the level starts: 70 under the maple, fewer under smaller trees and bushes. Each new leaf that lands joins the carpet, and the oldest one fades. Landed leaves lie just above the ground decor, under grass and characters.
 - **Not yet:** landed leaves skittering in gusts, and trees rustling when bumped.
 
 ---
@@ -181,7 +185,7 @@ A field can hold **tens of thousands of blades**, so:
 
 All of these use the same `windAt()`:
 
-- **Bushes:** small PixelLab images on the `Trees` layer, swaying like a small tree. They block movement like a trunk.
+- **Bushes:** small PixelLab images on the `Trees` layer (round, berry, flowering, and their autumn versions), swaying like a small tree. They block movement like a trunk.
 - **Flowers:** a grass blade type (a stalk with a flower on top in berry, violet or autumn), scattered in grass areas and pushed like grass.
 - **Reeds:** a tall grass blade type for the water's edge, ready for the water blueprint.
 - **Hanging things:** signs, flags and washing lines, drawn by code on the palette (`src/nature/hangingShapes.ts`) and placed on a **`Hanging` object layer** in Tiled. The map test checks their types and shapes.
