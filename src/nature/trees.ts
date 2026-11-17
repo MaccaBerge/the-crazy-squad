@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import type { MapObject } from '../world/spawner';
 import { DEPTH } from '../world/constants';
-import { isTreeName, MAX_SWAY_POSE, swayOffset, TREE_TYPES, type TreeName } from './treeTypes';
+import { isTreeName, swayOffset, TREE_TYPES, type TreeType } from './treeTypes';
 import type { WindParams } from './weather';
 import { wind } from './wind';
 
@@ -10,31 +10,21 @@ import { wind } from './wind';
 
 const FADED = 0.45; // canopy alpha while the player is behind it
 const FADE_SPEED = 8; // per second
+const LAG = 0.5; // s the canopy's bottom trails its top, so gusts ripple down the tree
 
 /** Queue every tree image. Call from preload(). */
 export function preloadTrees(scene: Phaser.Scene) {
   for (const name of Object.keys(TREE_TYPES)) scene.load.image(`tree:${name}`, `assets/trees/${name}.png`);
 }
 
-/** Draws each tree type's sway poses side by side into one canvas texture, frames `-3`..`3`. */
-function makeSwayTexture(scene: Phaser.Scene, name: TreeName) {
-  const key = `tree-sway:${name}`;
-  if (scene.textures.exists(key)) return key;
-  const img = scene.textures.get(`tree:${name}`).getSourceImage() as HTMLImageElement;
-  const poses = MAX_SWAY_POSE * 2 + 1;
-  const tex = scene.textures.createCanvas(key, img.width * poses, img.height)!;
-  const ctx = tex.getContext();
-  for (let i = 0; i < poses; i++) {
-    const pose = i - MAX_SWAY_POSE;
-    for (let y = 0; y < img.height; y++)
-      ctx.drawImage(img, 0, y, img.width, 1, i * img.width + swayOffset(TREE_TYPES[name], pose, y), y, img.width, 1);
-    tex.add(String(pose), 0, i * img.width, 0, img.width, img.height);
-  }
-  tex.refresh();
-  return key;
+interface Tree {
+  sprite: Phaser.GameObjects.Image;
+  tex: Phaser.Textures.CanvasTexture;
+  img: HTMLImageElement;
+  type: TreeType;
+  offsets: Int8Array; // current shift of each pixel row
+  flex: number;
 }
-
-interface Tree { sprite: Phaser.GameObjects.Sprite; pose: number; flex: number }
 
 export class Trees {
   readonly bodies: Phaser.Physics.Arcade.StaticBody[] = [];
@@ -46,19 +36,40 @@ export class Trees {
       if (!isTreeName(o.type)) continue; // the map test rejects unknown types
       const t = TREE_TYPES[o.type];
       const x = Math.round(o.x ?? 0), y = Math.round(o.y ?? 0);
-      const key = makeSwayTexture(scene, o.type);
-      const sprite = scene.add.sprite(x, y, key, '0').setDepth(DEPTH.actors + y);
-      sprite.setOrigin(t.base.x / sprite.width, t.base.y / sprite.height);
+      const img = scene.textures.get(`tree:${o.type}`).getSourceImage() as HTMLImageElement;
+      const tex = scene.textures.createCanvas(`tree-sway:${o.id}`, img.width, img.height)!; // each tree ripples on its own
+      tex.getContext().drawImage(img, 0, 0);
+      tex.refresh();
+      const sprite = scene.add.image(x, y, tex).setDepth(DEPTH.actors + y);
+      sprite.setOrigin(t.base.x / img.width, t.base.y / img.height);
       this.bodies.push(scene.physics.add.staticBody(x - t.block.w / 2, y - t.block.h, t.block.w, t.block.h));
-      this.trees.push({ sprite, pose: 0, flex: 0.8 + ((o.id * 7919) % 100) / 250 }); // trees differ a little in stiffness
+      this.trees.push({ sprite, tex, img, type: t, offsets: new Int8Array(t.swayFrom), flex: 0.8 + ((o.id * 7919) % 100) / 250 }); // trees differ a little in stiffness
     }
   }
 
   /** Whether the tree has an opaque pixel at world point (x, y). */
-  private covers(s: Phaser.GameObjects.Sprite, x: number, y: number) {
+  private covers(s: Phaser.GameObjects.Image, x: number, y: number) {
     const lx = Math.floor(x - (s.x - s.displayOriginX)), ly = Math.floor(y - (s.y - s.displayOriginY));
     if (lx < 0 || ly < 0 || lx >= s.width || ly >= s.height) return false;
     return s.scene.textures.getPixelAlpha(lx, ly, s.texture.key, s.frame.name) > 0;
+  }
+
+  /** Shifts each canopy row by the wind it feels, lagging further down; redraws only when a row moved. */
+  private sway(tree: Tree, t: number, weather: WindParams, side: number) {
+    const { sprite: s, type, offsets } = tree;
+    const top = s.y - s.displayOriginY;
+    let changed = false;
+    for (let y = 0; y < type.swayFrom; y++) {
+      const lag = LAG * (y / type.swayFrom);
+      const lean = Math.max(-1, Math.min(1, wind(s.x, top + y, t - lag, weather) * side * tree.flex));
+      const off = swayOffset(type, lean, y, t);
+      if (off !== offsets[y]) (offsets[y] = off), (changed = true);
+    }
+    if (!changed) return;
+    const ctx = tree.tex.getContext();
+    ctx.clearRect(0, 0, tree.img.width, type.swayFrom);
+    for (let y = 0; y < type.swayFrom; y++) ctx.drawImage(tree.img, 0, y, tree.img.width, 1, offsets[y], y, tree.img.width, 1);
+    tree.tex.refresh();
   }
 
   /** Sways every tree with the wind and fades canopies the focus (the player's feet) is behind. */
@@ -66,9 +77,7 @@ export class Trees {
     const side = Math.cos((weather.windDir * Math.PI) / 180);
     for (const tree of this.trees) {
       const s = tree.sprite;
-      const w = wind(s.x, s.y - s.displayHeight / 2, t, weather) * side;
-      const pose = Math.max(-MAX_SWAY_POSE, Math.min(MAX_SWAY_POSE, Math.round(w * tree.flex * MAX_SWAY_POSE)));
-      if (pose !== tree.pose) s.setFrame(String((tree.pose = pose)));
+      this.sway(tree, t, weather, side);
       const behind = focus.y < s.y && (this.covers(s, focus.x, focus.y - 6) || this.covers(s, focus.x, focus.y - 18));
       s.alpha += ((behind ? FADED : 1) - s.alpha) * Math.min(1, dt * FADE_SPEED);
     }

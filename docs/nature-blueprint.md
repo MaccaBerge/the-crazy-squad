@@ -133,8 +133,8 @@ A field can hold **tens of thousands of blades**, so:
 ### How it moves
 
 - **Row shifting** (DaFluffyPotato): each pixel row above `swayFrom` shifts sideways by whole pixels, more towards the top (up to `sway` px). The trunk below stays put.
-- The 7 poses (−3..3) are drawn once into a canvas texture when the level starts; at runtime a tree only switches frames.
-- The pose follows `wind()` at the canopy's centre, times the sideways part of the wind direction, times a small per-tree stiffness so neighbours don't move in lockstep.
+- **Each row feels its own wind,** and lower rows lag the top by up to half a second, so gusts ripple down the canopy. A small flutter keeps the leaves alive even in still air.
+- Each tree has its own canvas texture, redrawn only when a row moves. The lean is the sideways part of the wind, times a small per-tree stiffness so neighbours don't move in lockstep.
 
 ### Walking behind trees
 
