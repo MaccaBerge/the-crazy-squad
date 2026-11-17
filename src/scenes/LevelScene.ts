@@ -22,11 +22,15 @@ import { DEPTH, TILE } from '../world/constants';
 import { loadMap, preloadMap } from '../world/loadMap';
 import { spawnEntities } from '../world/spawner';
 import { Dogs, isDogKind, preloadDogs } from '../dogs/dogs';
+import { BREEDS } from '../dogs/breeds';
+import { DogAI } from '../dogs/dogAI';
+import type { Vec } from '../movement';
 
 const MAP = new URLSearchParams(location.search).get('map') ?? 'test'; // dev: ?map=backyard
 // Dev: ?grass=20000 covers the map in that many blades, with an fps readout (nature blueprint §8, step 2).
 const STRESS_BLADES = Number(new URLSearchParams(location.search).get('grass')) || 0;
 const NUDGE_SPEED = 0.6; // corner assist sideways speed, as a share of top speed
+const HURT = 0.18; // seconds a hit pushes you around before your input counts again
 
 /** Live-tunable values (T panel). Character stats multiply the movement values. */
 // Walking is the default; holding sprint raises speed to sprintSpeed while stamina lasts.
@@ -69,6 +73,9 @@ export class LevelScene extends Phaser.Scene {
   private hanging!: Hanging;
   private look!: WeatherLook;
   private dogs!: Dogs;
+  private brains: DogAI[] = [];
+  private hurt = 0;
+  private knock: Vec = { x: 0, y: 0 };
   private readout?: HTMLDivElement;
 
   constructor() {
@@ -108,7 +115,12 @@ export class LevelScene extends Phaser.Scene {
     this.dogs = new Dogs(this);
     spawnEntities(map, {
       PlayerSpawn: (o) => (spawn = { x: o.x ?? spawn.x, y: o.y ?? spawn.y }),
-      Dog: (o, p) => (isDogKind(p.kind) ? this.dogs.add(p.kind, o.x ?? 0, o.y ?? 0, typeof p.anim === 'string' ? { anim: p.anim, dir: String(p.dir ?? 'south') } : undefined) : console.warn(`Dog ${o.id}: unknown kind "${p.kind}"`)),
+      Dog: (o, p) => {
+        if (!isDogKind(p.kind)) return console.warn(`Dog ${o.id}: unknown kind "${p.kind}"`);
+        const breed = BREEDS[p.kind];
+        if (p.ai === true && breed) this.brains.push(new DogAI(this, p.kind, breed, o.x ?? 0, o.y ?? 0));
+        else this.dogs.add(p.kind, o.x ?? 0, o.y ?? 0, typeof p.anim === 'string' ? { anim: p.anim, dir: String(p.dir ?? 'south') } : undefined);
+      },
     });
 
     // All four exist, but only the active one is enabled; the others are off stage (players blueprint §2).
@@ -123,7 +135,9 @@ export class LevelScene extends Phaser.Scene {
     });
     onStage(this.active, spawn.x, spawn.y);
     this.trees = new Trees(this, map.getObjectLayer('Trees')?.objects ?? []);
-    this.physics.add.collider(this.sprites, [...colliders, ...this.trees.bodies, ...this.dogs.sprites]);
+    const thinking = this.brains.map((d) => d.sprite);
+    this.physics.add.collider(this.sprites, [...colliders, ...this.trees.bodies, ...this.dogs.sprites, ...thinking]);
+    this.physics.add.collider(thinking, [...colliders, ...this.trees.bodies, ...this.dogs.sprites]);
     this.leaves = new FallingLeaves(this, this.trees.sources);
     this.hanging = new Hanging(this, map.getObjectLayer('Hanging')?.objects ?? []);
     this.look = new WeatherLook(this, tuning.light);
@@ -165,6 +179,13 @@ export class LevelScene extends Phaser.Scene {
     if (swap) this.trySwap(swap);
 
     const s = this.active;
+    for (const d of this.brains) d.step(dt, s, tuning, (push) => this.hit(push));
+    if (this.hurt > 0) {
+      // Knocked back: the push fades out and your input waits, so the hit reads.
+      this.hurt = Math.max(0, this.hurt - dt);
+      s.body.setVelocity(this.knock.x * (this.hurt / HURT), this.knock.y * (this.hurt / HURT));
+      return;
+    }
     const p = this.moveParams(this.party.active, this.sprinting);
     // Exhausted (bar just ran dry): walk slower. Animation speed still compares to the normal walk, so the legs look heavy.
     p.maxSpeed *= this.party.stamina[this.party.activeIndex].speedFactor;
@@ -206,6 +227,14 @@ export class LevelScene extends Phaser.Scene {
     return r.x >= w.x && r.x + r.w <= w.right && r.y >= w.y && r.y + r.h <= w.bottom && rectFree(r, this.solid);
   }
 
+  /** A dog's attack landed on the active character. */
+  // shortcut: no health or damage yet, only the push and a red flash; build the hit pipeline (collision blueprint §7) next.
+  private hit(push: Vec) {
+    this.hurt = HURT;
+    this.knock = push;
+    this.flash(this.active, 0xb4443a);
+  }
+
   private flash(s: CharSprite, color: number) {
     s.setTint(color).setTintMode(Phaser.TintModes.FILL);
     this.time.delayedCall(80, () => s.clearTint());
@@ -237,6 +266,7 @@ export class LevelScene extends Phaser.Scene {
     this.hanging.update(this.time.now / 1000, Math.min(delta / 1000, 0.05), tuning);
     this.look.update(Math.min(delta / 1000, 0.05), tuning.light);
     this.dogs.face(this.active.x, this.active.y - 8);
+    for (const d of this.brains) d.update(this.time.now, this.physics.world.drawDebug);
     if (this.grass) {
       const start = performance.now();
       const forces = [footForce(s.x, s.y, this.party.active.body.w)];
