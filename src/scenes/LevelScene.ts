@@ -11,6 +11,7 @@ import { LocalController } from '../input/localController';
 import { defaultMove, stepVelocity } from '../movement';
 import { Party, SWAP_ACTIONS, type SwapAction } from '../party/party';
 import { DEFAULT_WEATHER, isWeather, WEATHER } from '../nature/weather';
+import { footForce } from '../nature/forces';
 import { Grass, scatter } from '../nature/grass';
 import { gust, wind } from '../nature/wind';
 import { DEPTH, TILE } from '../world/constants';
@@ -211,10 +212,11 @@ export class LevelScene extends Phaser.Scene {
     if (this.windView.visible) this.drawWind();
     if (this.grass) {
       const start = performance.now();
-      const changed = this.grass.update(this.cameras.main.worldView, this.time.now / 1000, tuning);
+      const forces = [footForce(s.x, s.y, this.party.active.body.w)];
+      const changed = this.grass.update(this.cameras.main.worldView, this.time.now / 1000, delta / 1000, tuning, forces);
       const ms = performance.now() - start;
       if (this.readout && this.game.getFrame() % 30 === 0)
-        this.readout.textContent = `${STRESS_BLADES} blades · ${changed} re-posed in ${ms.toFixed(2)} ms · ${this.game.loop.actualFps.toFixed(0)} fps`;
+        this.readout.textContent = `${STRESS_BLADES} blades · ${this.grass.pushed} pushed · ${changed} re-posed in ${ms.toFixed(2)} ms · ${this.game.loop.actualFps.toFixed(0)} fps`;
     }
   }
 
