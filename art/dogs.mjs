@@ -40,6 +40,24 @@ function bob(px) {
   return out;
 }
 
+/**
+ * PixelLab draws front and back walks with both arms in sync (mirror images), so swing them here: in the first half
+ * of the loop the left arm sits 1 px lower and the right 1 px higher, in the second half the other way round.
+ * Arms = the outer columns of the body, from the shoulders down to just above the feet.
+ */
+function swingArms(px, i, n) {
+  const op = (x, y) => px[(y * S + x) * 4 + 3] > 0;
+  let top = S, feet = 0, lo = S, hi = 0;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (op(x, y)) { top = Math.min(top, y); feet = y; lo = Math.min(lo, x); hi = Math.max(hi, x); }
+  const arm = Math.max(3, Math.round((hi - lo + 1) * 0.22)), a = top + Math.round((feet - top) * 0.3), b = feet - 3, out = px.slice();
+  const at = (x, y) => px.subarray((y * S + x) * 4, (y * S + x + 1) * 4);
+  const shift = (x0, x1, dy) => { for (let x = x0; x <= x1; x++) for (let y = a + 1; y < b; y++) out.set(at(x, y - dy), (y * S + x) * 4); };
+  const down = i < n / 2 ? 1 : -1;
+  shift(lo, lo + arm - 1, down);
+  shift(hi - arm + 1, hi, -down);
+  return out;
+}
+
 for (const name of fs.readdirSync(src).filter((n) => fs.statSync(path.join(src, n)).isDirectory())) {
   const dir = path.join(src, name);
   const rotations = ORDER.map((d) => decode(fs.readFileSync(path.join(dir, 'rotations', `${d}.png`))));
@@ -59,7 +77,8 @@ for (const name of fs.readdirSync(src).filter((n) => fs.statSync(path.join(src, 
       const fd = path.join(animDir, anim, d);
       const imgs = fs.readdirSync(fd).filter((f) => f.endsWith('.png')).sort().map((f) => decode(fs.readFileSync(path.join(fd, f))));
       const from = feet(imgs);
-      anims[`${anim}-${d}`] = imgs.map((im) => frames.push(cut(im, from, footRow)) - 1);
+      const swing = ['walk', 'run'].includes(anim) && ['north', 'south'].includes(d);
+      anims[`${anim}-${d}`] = imgs.map((im, i) => { const f = cut(im, from, footRow); return frames.push(swing ? swingArms(f, i, imgs.length) : f) - 1; });
     }
   }
   const rows = Math.ceil(frames.length / COLS), W = COLS * S, sheet = new Uint8Array(W * rows * S * 4);
