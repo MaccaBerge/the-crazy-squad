@@ -3,6 +3,13 @@
  "height": 20,
  "width": 30,
  "infinite": false,
+ "properties": [
+  {
+   "name": "weather",
+   "type": "string",
+   "value": "sunny"
+  }
+ ],
  "orientation": "orthogonal",
  "renderorder": "right-down",
  "tiledversion": "1.11.0",

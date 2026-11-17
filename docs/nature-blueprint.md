@@ -113,6 +113,7 @@ A field can hold **tens of thousands of blades**, so:
 - **Forces are few.** Only chunks a force overlaps run the per-blade push and spring.
 - **Y-sorting:** blades are sorted once at load, in strips; actors slot between strips by depth.
 - **Stress test before art:** a debug map with **~20,000 blades** and several moving bodies has to hold 60 fps on a normal laptop before we build on it. If `SpriteGPULayer` doesn't fit (sorting with actors is the risk), the fallback is DaFluffyPotato's trick: pre-render each chunk's layout per wind pose and draw whole chunks as images.
+- **Stress test result (step 2, on the dev Mac):** open the game with `?grass=20000`. 20,000 blades in a storm hold 60 fps, and the grass update takes about 0.1–1 ms a frame. 100,000 blades also hold 60 fps. Only blades whose pose changes are re-uploaded: about 50–100 a frame at 20,000. Not yet checked: a slower laptop, and sorting blades with the characters (step 4).
 
 ---
 
