@@ -18,7 +18,7 @@
  "tileheight": 16,
  "compressionlevel": -1,
  "nextlayerid": 9,
- "nextobjectid": 26,
+ "nextobjectid": 31,
  "layers": [
   {
    "id": 1,
@@ -11278,6 +11278,101 @@
      "height": 0,
      "rotation": 0,
      "visible": true
+    },
+    {
+     "id": 26,
+     "name": "heavy-gunner",
+     "type": "Dog",
+     "point": true,
+     "x": 300,
+     "y": 400,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "heavy-gunner"
+      }
+     ]
+    },
+    {
+     "id": 27,
+     "name": "k9-cop",
+     "type": "Dog",
+     "point": true,
+     "x": 340,
+     "y": 400,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "k9-cop"
+      }
+     ]
+    },
+    {
+     "id": 28,
+     "name": "long-shot",
+     "type": "Dog",
+     "point": true,
+     "x": 380,
+     "y": 400,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "long-shot"
+      }
+     ]
+    },
+    {
+     "id": 29,
+     "name": "bruiser",
+     "type": "Dog",
+     "point": true,
+     "x": 420,
+     "y": 400,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "bruiser"
+      }
+     ]
+    },
+    {
+     "id": 30,
+     "name": "mad-bomber",
+     "type": "Dog",
+     "point": true,
+     "x": 460,
+     "y": 400,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "mad-bomber"
+      }
+     ]
     }
    ]
   }

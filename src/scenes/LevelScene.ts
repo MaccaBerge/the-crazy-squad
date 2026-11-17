@@ -21,6 +21,7 @@ import { gust, windAt } from '../nature/wind';
 import { DEPTH, TILE } from '../world/constants';
 import { loadMap, preloadMap } from '../world/loadMap';
 import { spawnEntities } from '../world/spawner';
+import { Dogs, isDogKind, preloadDogs } from '../dogs/dogs';
 
 const MAP = new URLSearchParams(location.search).get('map') ?? 'test'; // dev: ?map=backyard
 // Dev: ?grass=20000 covers the map in that many blades, with an fps readout (nature blueprint §8, step 2).
@@ -67,6 +68,7 @@ export class LevelScene extends Phaser.Scene {
   private leaves!: FallingLeaves;
   private hanging!: Hanging;
   private look!: WeatherLook;
+  private dogs!: Dogs;
   private readout?: HTMLDivElement;
 
   constructor() {
@@ -80,6 +82,7 @@ export class LevelScene extends Phaser.Scene {
   preload() {
     preloadMap(this, MAP);
     preloadSprites(this, SQUAD);
+    preloadDogs(this);
     preloadTrees(this);
   }
 
@@ -102,7 +105,11 @@ export class LevelScene extends Phaser.Scene {
     }
 
     let spawn = { x: map.widthInPixels / 2, y: map.heightInPixels / 2 };
-    spawnEntities(map, { PlayerSpawn: (o) => (spawn = { x: o.x ?? spawn.x, y: o.y ?? spawn.y }) });
+    this.dogs = new Dogs(this);
+    spawnEntities(map, {
+      PlayerSpawn: (o) => (spawn = { x: o.x ?? spawn.x, y: o.y ?? spawn.y }),
+      Dog: (o, p) => (isDogKind(p.kind) ? this.dogs.add(p.kind, o.x ?? 0, o.y ?? 0) : console.warn(`Dog ${o.id}: unknown kind "${p.kind}"`)),
+    });
 
     // All four exist, but only the active one is enabled; the others are off stage (players blueprint §2).
     this.sprites = SQUAD.map((def) => {
@@ -116,7 +123,7 @@ export class LevelScene extends Phaser.Scene {
     });
     onStage(this.active, spawn.x, spawn.y);
     this.trees = new Trees(this, map.getObjectLayer('Trees')?.objects ?? []);
-    this.physics.add.collider(this.sprites, [...colliders, ...this.trees.bodies]);
+    this.physics.add.collider(this.sprites, [...colliders, ...this.trees.bodies, ...this.dogs.sprites]);
     this.leaves = new FallingLeaves(this, this.trees.sources);
     this.hanging = new Hanging(this, map.getObjectLayer('Hanging')?.objects ?? []);
     this.look = new WeatherLook(this, tuning.light);
@@ -229,6 +236,7 @@ export class LevelScene extends Phaser.Scene {
     this.leaves.update(this.time.now / 1000, Math.min(delta / 1000, 0.05), tuning);
     this.hanging.update(this.time.now / 1000, Math.min(delta / 1000, 0.05), tuning);
     this.look.update(Math.min(delta / 1000, 0.05), tuning.light);
+    this.dogs.face(this.active.x, this.active.y - 8);
     if (this.grass) {
       const start = performance.now();
       const forces = [footForce(s.x, s.y, this.party.active.body.w)];
