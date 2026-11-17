@@ -14,7 +14,7 @@ import { DEPTH } from '../world/constants';
 import { loadMap, preloadMap } from '../world/loadMap';
 import { spawnEntities } from '../world/spawner';
 
-const MAP = 'test';
+const MAP = new URLSearchParams(location.search).get('map') ?? 'test'; // dev: ?map=backyard
 const NUDGE_SPEED = 0.6; // corner assist sideways speed, as a share of top speed
 
 /** Live-tunable values (T panel). Character stats multiply the movement values. */
