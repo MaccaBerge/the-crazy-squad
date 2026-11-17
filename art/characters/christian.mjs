@@ -7,14 +7,17 @@
 export const size = 32;
 export const columns = 6; // idle ×2, walk ×4
 
-export const palette = {
-  o: 0x1a1420, // outline
-  h: 0x1f1a19, H: 0x3d3330, b: 0x1f1a19, // hair, highlight, brows/pupils
-  s: 0xc68a5f, S: 0xa16a44, t: 0x9c6f4e, // tan skin, shade, stubble
-  w: 0xf4f4f4,
-  u: 0xd0312d, U: 0x8a1c20, // red suit, shade
-  y: 0xf5c542, k: 0xf5c542, K: 0xc9962a, // yellow accents, boots, boot shade
-  r: 0xf5c542, // scarf
+import { tintOutlines } from '../palette.mjs';
+
+// All colors from art/palette.mjs; `o` becomes a tinted outline per region (see tintOutlines).
+const basePalette = {
+  o: 0x241520, // outline (fallback)
+  h: 0x3a1f2e, H: 0x5a2d3e, b: 0x241520, // hair, highlight, brows/pupils (shadow ramp)
+  s: 0xd89a6c, S: 0xb8754e, t: 0x8a5038, // skin, shade, stubble
+  w: 0xfff6dc,
+  u: 0xb4443a, U: 0x7a2a36, // red suit, shade (autumn ramp)
+  y: 0xf2a846, k: 0xf2a846, K: 0xde7438, // gold accents, boots, boot shade
+  r: 0xf2a846, // scarf
 };
 
 const rows = (ys, x, s) => ys.map((y) => [y, x, s]);
@@ -205,7 +208,7 @@ function direction(dir) {
 // Rows in the sheet. Left-facing directions are these flipped in game.
 const DIRS = { down: 'down', 'down-side': 'downSide', side: 'side', 'up-side': 'upSide', up: 'up' };
 
-export const frames = Object.values(DIRS).flatMap(direction);
+export const { frames, palette } = tintOutlines(Object.values(DIRS).flatMap(direction), basePalette);
 
 export const anims = {};
 Object.keys(DIRS).forEach((dir, row) => {
