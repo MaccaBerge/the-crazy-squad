@@ -13,6 +13,7 @@ import { Party, SWAP_ACTIONS, type SwapAction } from '../party/party';
 import { DEFAULT_WEATHER, isWeather, WEATHER } from '../nature/weather';
 import { footForce } from '../nature/forces';
 import { bladesFromMap, Grass, scatter } from '../nature/grass';
+import { preloadTrees, Trees } from '../nature/trees';
 import { gust, wind } from '../nature/wind';
 import { DEPTH, TILE } from '../world/constants';
 import { loadMap, preloadMap } from '../world/loadMap';
@@ -59,6 +60,7 @@ export class LevelScene extends Phaser.Scene {
   private facingDot!: Phaser.GameObjects.Image;
   private windView!: Phaser.GameObjects.Graphics;
   private grass?: Grass;
+  private trees!: Trees;
   private readout?: HTMLDivElement;
 
   constructor() {
@@ -72,6 +74,7 @@ export class LevelScene extends Phaser.Scene {
   preload() {
     preloadMap(this, MAP);
     preloadSprites(this, SQUAD);
+    preloadTrees(this);
   }
 
   create() {
@@ -106,7 +109,8 @@ export class LevelScene extends Phaser.Scene {
       return s;
     });
     onStage(this.active, spawn.x, spawn.y);
-    this.physics.add.collider(this.sprites, colliders);
+    this.trees = new Trees(this, map.getObjectLayer('Trees')?.objects ?? []);
+    this.physics.add.collider(this.sprites, [...colliders, ...this.trees.bodies]);
     this.facingDot = this.add.image(0, 0, 'dot');
     this.staminaBar = this.add.graphics().setDepth(DEPTH.effects);
 
@@ -212,6 +216,7 @@ export class LevelScene extends Phaser.Scene {
     this.rig.update(s.body.velocity, this.moveParams(this.party.active, this.sprinting).maxSpeed, delta / 1000);
     this.drawStamina(s, delta / 1000);
     if (this.windView.visible) this.drawWind();
+    this.trees.update(this.time.now / 1000, delta / 1000, tuning, s);
     if (this.grass) {
       const start = performance.now();
       const forces = [footForce(s.x, s.y, this.party.active.body.w)];
