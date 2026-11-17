@@ -3,7 +3,7 @@ import { DEPTH } from '../world/constants';
 import type { MapObject } from '../world/spawner';
 import { type Flag, flagPixels, flagStep, isHangingKind, lineClothes, linePixels, type Pendulum, type Px, signPixels, swingStep } from './hangingShapes';
 import type { WindParams } from './weather';
-import { wind } from './wind';
+import { prevailing, windAt } from './wind';
 
 // Hanging things (nature blueprint §6) from the map's `Hanging` layer: signs and flags are points where the post meets
 // the ground; a washing line is a rectangle whose bottom edge runs between its two posts. Each has its own small canvas,
@@ -54,9 +54,9 @@ export class Hanging {
   }
 
   update(t: number, dt: number, weather: WindParams) {
-    const side = Math.cos((weather.windDir * Math.PI) / 180);
+    const side = Math.cos(prevailing(t, weather)); // flags fly to the side the wind is blowing to overall
     for (const thing of this.things) {
-      thing.swing(wind(thing.x, thing.y - 20, t, weather) * side, dt, Math.abs(side) < 0.1 ? 0 : Math.sign(side));
+      thing.swing(windAt(thing.x, thing.y - 20, t, weather).x, dt, Math.abs(side) < 0.1 ? 0 : Math.sign(side));
       const px = thing.draw(t);
       const h = hash(px);
       if (h === thing.drawn) continue;

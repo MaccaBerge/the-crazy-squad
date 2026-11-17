@@ -45,6 +45,7 @@ const { panel, sync } = tuningPanel(tuning, {
   windGust: [0, 1, 0.05],
   gustEvery: [1, 20, 0.5],
   windDir: [0, 359, 5],
+  windVeer: [0, 90, 5],
 });
 
 // Weather preset switch: loads a preset's values into the wind sliders.

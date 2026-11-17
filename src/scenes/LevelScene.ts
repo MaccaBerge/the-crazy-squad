@@ -16,7 +16,7 @@ import { bladesFromMap, Grass, scatter } from '../nature/grass';
 import { Hanging } from '../nature/hanging';
 import { FallingLeaves } from '../nature/leaves';
 import { preloadTrees, Trees } from '../nature/trees';
-import { gust, wind } from '../nature/wind';
+import { gust, windAt } from '../nature/wind';
 import { DEPTH, TILE } from '../world/constants';
 import { loadMap, preloadMap } from '../world/loadMap';
 import { spawnEntities } from '../world/spawner';
@@ -235,18 +235,15 @@ export class LevelScene extends Phaser.Scene {
     }
   }
 
-  /** One arrow per tile in view: length is the wind's strength, orange where a gust is passing. */
+  /** One arrow per tile in view, pointing where the wind blows there: length is its strength, orange where a gust is passing. */
   private drawWind() {
     const g = this.windView.clear();
     const view = this.cameras.main.worldView;
     const t = this.time.now / 1000;
-    const d = (tuning.windDir * Math.PI) / 180;
-    const [dx, dy] = [Math.cos(d), Math.sin(d)];
     for (let y = Math.floor(view.y / TILE) * TILE + TILE / 2; y < view.bottom; y += TILE)
       for (let x = Math.floor(view.x / TILE) * TILE + TILE / 2; x < view.right; x += TILE) {
-        const w = wind(x, y, t, tuning);
-        const len = w * 12;
-        g.lineStyle(1, gust(x, y, t, tuning) > 0.3 ? 0xf2a846 : 0x8edcf2).lineBetween(x, y, x + dx * len, y + dy * len);
+        const w = windAt(x, y, t, tuning);
+        g.lineStyle(1, gust(x, y, t, tuning) > 0.3 ? 0xf2a846 : 0x8edcf2).lineBetween(x, y, x + w.x * 12, y + w.y * 12);
         g.fillStyle(0x241520).fillRect(x - 0.5, y - 0.5, 1, 1);
       }
   }

@@ -4,7 +4,7 @@ import { DEPTH } from '../world/constants';
 import { clumpOffset, findClumps, UNDER, type Clump } from './leafClumps';
 import { isTreeName, TREE_TYPES, type TreeType } from './treeTypes';
 import type { WindParams } from './weather';
-import { wind } from './wind';
+import { windAt } from './wind';
 
 // Trees (nature blueprint §5): one sprite each, depth-sorted like actors, a static hitbox at the trunk, leaf clumps
 // swaying as whole pieces (DaFluffyPotato's foliage trick) and fading while the player is behind the canopy.
@@ -103,12 +103,12 @@ export class Trees {
   }
 
   /** Moves each leaf clump with the wind where it sits; redraws only when a clump moved. */
-  private sway(tree: Tree, t: number, weather: WindParams, side: number) {
+  private sway(tree: Tree, t: number, weather: WindParams) {
     const { sprite: s, type, offsets, parts } = tree;
     const left = s.x - s.displayOriginX, top = s.y - s.displayOriginY;
     let changed = false;
     parts.clumps.forEach(({ clump }, k) => {
-      const lean = Math.max(-1, Math.min(1, wind(left + clump.cx, top + clump.cy, t, weather) * side * tree.flex));
+      const lean = Math.max(-1, Math.min(1, windAt(left + clump.cx, top + clump.cy, t, weather).x * tree.flex));
       const { dx, dy } = clumpOffset(clump, k, lean, t, type.sway, type.swayFrom);
       if (dx !== offsets[k * 2] || dy !== offsets[k * 2 + 1]) (offsets[k * 2] = dx), (offsets[k * 2 + 1] = dy), (changed = true);
     });
@@ -122,10 +122,9 @@ export class Trees {
 
   /** Sways every tree with the wind and fades canopies the focus (the player's feet) is behind. */
   update(t: number, dt: number, weather: WindParams, focus: { x: number; y: number }) {
-    const side = Math.cos((weather.windDir * Math.PI) / 180);
     for (const tree of this.trees) {
       const s = tree.sprite;
-      this.sway(tree, t, weather, side);
+      this.sway(tree, t, weather);
       const behind = focus.y < s.y && (this.covers(s, focus.x, focus.y - 6) || this.covers(s, focus.x, focus.y - 18));
       s.alpha += ((behind ? FADED : 1) - s.alpha) * Math.min(1, dt * FADE_SPEED);
     }
