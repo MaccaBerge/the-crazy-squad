@@ -171,7 +171,9 @@ export class Grass {
       const layer = scene.add.spriteGPULayer(TEXTURE, end - start).setDepth(depth + strip * STRIP);
       for (let i = start; i < end; i++) {
         const b = blades[i];
-        layer.addMember({ x: b.x + 0.5, y: b.y + 1, originX: 0.5, originY: 1, frame: `${b.type}:0` });
+        // The root is the cell's middle column (CELL.w / 2), so x = b.x puts it on b.x with the quad's edges on whole pixels.
+        // An edge on a half pixel snaps at a different camera scroll than the ground, and the grass jitters against it.
+        layer.addMember({ x: b.x, y: b.y + 1, originX: 0.5, originY: 1, frame: `${b.type}:0` });
         this.layerOf[i] = this.layers.length;
         this.member[i] = i - start;
       }
