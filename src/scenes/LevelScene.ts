@@ -17,7 +17,7 @@ import { DEPTH, TILE } from '../world/constants';
 import { loadMap, preloadMap } from '../world/loadMap';
 import { spawnEntities } from '../world/spawner';
 
-const MAP = 'test';
+const MAP = new URLSearchParams(location.search).get('map') ?? 'test'; // dev: ?map=backyard
 // Dev: ?grass=20000 covers the map in that many blades, with an fps readout (nature blueprint §8, step 2).
 const STRESS_BLADES = Number(new URLSearchParams(location.search).get('grass')) || 0;
 const NUDGE_SPEED = 0.6; // corner assist sideways speed, as a share of top speed

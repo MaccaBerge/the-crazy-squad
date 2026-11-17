@@ -17,7 +17,7 @@ export const ENTITY_TYPES = ['PlayerSpawn'] as const;
 export type EntityType = (typeof ENTITY_TYPES)[number];
 
 /** Tileset texture key = tileset name in Tiled = file name in public/assets/tilesets/. */
-export const TILESETS = ['placeholder'] as const;
+export const TILESETS = ['placeholder', 'backyard'] as const;
 
 export const DEPTH = {
   Ground: 0,
