@@ -9,7 +9,7 @@ How the living parts of the world work: the weather, the wind, the grass and the
 - **Grass is its own system, separate from the tiles.** Tiles can still have static grass drawn in. The moving grass is drawn in code on top.
 - **Grass size is flexible:** a single tuft, a patch or a whole field. Fields need real performance work.
 - **Everything that moves bends the grass correctly:** characters, dogs, thrown things, anything with a body.
-- **Trees are big and lush,** built from leaf bundles that sway in the wind, in Slynyrd's Pixelblog 44 style.
+- **Trees are big, majestic and a little mystic,** PixelLab images with thick, detailed trunks that sway in the wind. Most trees stay modest; only a couple are huge.
 - **Grass is thin single blades,** one sprite per blade, like DaFluffyPotato's.
 - **Canopies fade** when a character is behind them.
 - **Falling leaves** drift off trees in the wind.
@@ -125,34 +125,30 @@ A field can hold **tens of thousands of blades**, so:
 
 ### How a tree is drawn
 
-Following Slynyrd's Pixelblog 44:
-
-- **Leaf bundles.** One leaf shape per tree type, repeated into **bundles** of about 12–24 px, each shaded like a sphere lit from the top-left in 4–5 tones of teal or fern, with dusk in the deepest gaps.
-- **Bundle variants.** The same bundle shifted one step darker or lighter on the ramp. Darker bundles go at the back and bottom, lighter ones at the front and top.
-- **Layered by light order:** back, dark bundles first; front, light ones last.
-- **Trunk:** a cylinder with bark stripes in wood, one tone darker on the right.
-- **Shadow:** a soft dusk-toned oval under the canopy (contact shadow, [world art style](world-art-style.md) rule 7).
-
-A tree is assembled from parts at runtime: a trunk image, a shadow and a list of bundles with positions and variants. That comes from a small JSON per tree type, so one set of bundles can make many different trees.
+- **One PixelLab image per tree type** (`create_object_pro_flash`, 160×160, one direction, low top-down, the nature palette, a character sprite as style anchor). The images live in `public/assets/trees/<type>.png`; their PixelLab ids are in `art/trees/pixellab.json`.
+- **On the palette, no soft edges:** a test checks every tree image like the characters and tilesets.
+- **Per type, in `src/nature/treeTypes.ts`:** where the trunk meets the ground (`base`), the trunk hitbox (`block`), and which rows sway (`swayFrom`, `sway`).
+- We tried Slynyrd's leaf bundles drawn by code first; the PixelLab trees looked far better, so bundles are dropped.
 
 ### How it moves
 
-- **Each bundle sways by whole pixels,** following `wind()` at the tree's position. Higher and outer bundles move more (`amount = wind * height factor`), the trunk not at all. With a 1–2 px swing, the canopy looks alive without breaking the pixel grid.
-- **A slight delay per bundle** (a phase offset from its position) makes the wave pass through the tree instead of the whole canopy moving at once.
-- The trunk and the bottom of the canopy can use DaFluffyPotato's row shifting instead: shift each pixel row by an amount that grows with height. We try both in the prototype and keep what looks better.
+- **Row shifting** (DaFluffyPotato): each pixel row above `swayFrom` shifts sideways by whole pixels, more towards the top (up to `sway` px). The trunk below stays put.
+- The 7 poses (−3..3) are drawn once into a canvas texture when the level starts; at runtime a tree only switches frames.
+- The pose follows `wind()` at the canopy's centre, times the sideways part of the wind direction, times a small per-tree stiffness so neighbours don't move in lockstep.
 
 ### Walking behind trees
 
-- Trunks block movement on the `Walls` layer; the canopy is drawn above the actors, like the `Above` layer ([world art style](world-art-style.md) rule 10).
-- Trees are placed as objects on a **`Trees` object layer** in Tiled (type, seed), not as tiles, so their bundles can move.
-- **Canopy fade:** when the local player's character (or a dog, so you can see threats) is under a canopy, the canopy fades to about 40% over a short time, and back when they leave. It checks the character's position against the canopy's bounds, not pixels.
+- Trees are **points on a `Trees` object layer** in Tiled, with the tree type as the object's type. The point is where the trunk meets the ground. The map test rejects unknown types.
+- **Depth:** a tree sorts with the actors by its base y, so you walk in front of the trunk below it and behind the canopy above it.
+- **Trunk collision:** a static body at the base blocks movement; the canopy doesn't.
+- **Canopy fade:** when the local player's feet are above the tree's base and an opaque tree pixel is just above them, the tree fades to 45%, and back when they leave.
 
 ### Falling leaves
 
 - Now and then a leaf detaches from a bundle and drifts down and along with `wind()`, tumbling through 2–4 pre-drawn frames, then settles on the ground and fades.
 - How often depends on the weather (more in `breezy` and `storm`) and the tree (more for autumn accent trees).
 - A small shared pool of leaf sprites, so the cost stays fixed.
-- Trees rustling when bumped is left for later; the bundle sway already has the hook for it.
+- Trees rustling when bumped is left for later.
 
 ---
 
@@ -160,7 +156,7 @@ A tree is assembled from parts at runtime: a trunk image, a shadow and a list of
 
 All of these use the same `wind()`:
 
-- **Bushes:** one to three leaf bundles on the ground, swaying like a small tree. They block movement like a trunk.
+- **Bushes:** small PixelLab images on the `Trees` layer, swaying like a small tree. They block movement like a trunk.
 - **Flowers:** a grass blade type (a stalk with a flower on top in berry, violet or autumn), scattered in grass areas and pushed like grass.
 - **Reeds:** a tall grass blade type for the water's edge, ready for the water blueprint.
 - **Hanging things:** signs, washing lines and flags in the neighbourhood. A few frames each, swinging further the stronger the wind.
@@ -175,10 +171,12 @@ src/nature/
   wind.ts        wind(x, y, t)          + wind.test.ts
   forces.ts      the list of moving bodies that push nature
   grass.ts       scatter, chunks, poses, the GPU layer   + grass.test.ts (scatter is seeded)
-  trees.ts       assembling and swaying bundle trees
+  treeTypes.ts   base, hitbox and sway per tree type   + treeTypes.test.ts
+  trees.ts       placing, swaying and fading trees
 art/nature/
   blades/        blade poses (on the palette)
-  trees/<type>/  trunk, bundles, tree.json
+art/trees/
+  pixellab.json  PixelLab ids of public/assets/trees/*.png
 ```
 
 `LevelScene` reads `weather`, the `Grass` layer and the `Trees` layer from the map, creates the systems and calls their `update`. Bodies add themselves to `forces` when they spawn.
@@ -192,7 +190,7 @@ art/nature/
 3. **Pushing:** forces from the characters, spring-back, flattening under feet.
 4. **Grass from Tiled:** the `Grass` layer, seeded scatter, depth with actors.
 5. **Real blade art** on the cool ramps, plus flowers and reeds.
-6. **One bundle tree:** parts, assembly, sway, canopy fade. Then more tree types and bushes.
+6. **Trees:** two PixelLab trees, sway, trunk collision, canopy fade. Then more tree types (mostly smaller) and bushes.
 7. **Falling leaves.**
 8. **Hanging things** for the neighbourhood.
 9. **Weather look:** tint and darkness per preset.
