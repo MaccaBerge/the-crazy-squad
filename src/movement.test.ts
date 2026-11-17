@@ -25,3 +25,7 @@ test('stops with decel and does not overshoot past zero', () => {
 test('reversing uses accel', () => {
   expect(run({ x: -1, y: 0 }, 0.1, { x: 100, y: 0 }).x).toBeCloseTo(0);
 });
+
+test('analog input below full length moves slower', () => {
+  expect(run({ x: 0.5, y: 0 }, 1)).toEqual({ x: 50, y: 0 });
+});

@@ -9,10 +9,14 @@ export type MoveParams = {
 // Tight and precise: ~0.04 s to top speed, ~0.05 s to stop.
 export const defaultMove: MoveParams = { maxSpeed: 100, accel: 2400, decel: 2200 };
 
-/** Moves velocity straight toward input × maxSpeed, without overshooting. */
+/**
+ * Moves velocity straight toward input × maxSpeed, without overshooting.
+ * Input longer than 1 (keyboard diagonals) is capped to 1; shorter input (a half-pushed stick) moves slower.
+ */
 export function stepVelocity(vel: Vec, input: Vec, dt: number, p: MoveParams): Vec {
   const len = Math.hypot(input.x, input.y);
-  const target = len > 0 ? { x: (input.x / len) * p.maxSpeed, y: (input.y / len) * p.maxSpeed } : { x: 0, y: 0 };
+  const scale = (len > 1 ? 1 / len : 1) * p.maxSpeed;
+  const target = { x: input.x * scale, y: input.y * scale };
   const dx = target.x - vel.x;
   const dy = target.y - vel.y;
   const dist = Math.hypot(dx, dy);
