@@ -59,12 +59,16 @@ describe.each(Object.entries(files))('%s', (_path, raw) => {
     expect(isWeather(weather), `map property "weather" is "${weather}"; use one of WEATHER in src/nature/weather.ts`).toBe(true);
   });
 
-  test('grass areas are rectangles or polygons with a sensible density', () => {
+  test('grass areas are rectangles or polygons with sensible properties', () => {
     for (const o of map.layers.find((l) => l.name === 'Grass')?.objects ?? []) {
       expect(o.ellipse || o.point, `grass area ${o.id} must be a rectangle or polygon`).toBeFalsy();
       expect(o.polygon || o.width, `grass area ${o.id} is empty`).toBeTruthy();
       const density = o.properties?.find((p) => p.name === 'density')?.value;
       if (density !== undefined) expect(density, `grass area ${o.id} density (blades per tile)`).toSatisfy((d) => typeof d === 'number' && d > 0 && d <= 64);
+      const flowers = o.properties?.find((p) => p.name === 'flowers')?.value;
+      if (flowers !== undefined) expect(flowers, `grass area ${o.id} flowers (share 0–1)`).toSatisfy((f) => typeof f === 'number' && f >= 0 && f <= 1);
+      const kind = o.properties?.find((p) => p.name === 'kind')?.value;
+      if (kind !== undefined) expect(['grass', 'reeds'], `grass area ${o.id} kind`).toContain(kind);
     }
   });
 });

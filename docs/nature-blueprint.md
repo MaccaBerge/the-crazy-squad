@@ -82,7 +82,8 @@ It lives in `src/nature/wind.ts` with a unit test (same input, same output; stay
 ### Where grass grows
 
 - In Tiled, a **`Grass` object layer** holds rectangles or polygons: grass areas. Properties: `density` (blades per tile), `types` (which blades), `height` (short or tall), `seed`.
-- Areas are rectangles or polygons. `density` defaults to 6 blades per tile, and `seed` defaults to the object's id. The map test rejects ellipses, points and odd densities.
+- Areas are rectangles or polygons. `density` defaults to 6 blades per tile, `seed` defaults to the object's id, `flowers` sets the share of flowers (default 0.04), and `kind: "reeds"` makes a reed bed (70% reeds, the rest grass).
+- The art is in `src/nature/bladeShapes.ts`: 6 grass blades, 3 flowers and 2 reeds, typed in as pixel rows on the cool ramps, with a weight for how often each is picked. Code bends them into the poses. The map test rejects ellipses, points and odd densities.
 - At level load, a **seeded scatter** fills each area with blades. Blades get a small random base lean and a random pose offset, so they don't all look alike.
 - Static grass painted on the ground tiles under them makes the area look full even where blades are sparse.
 
