@@ -1,0 +1,13 @@
+{
+  "columns": 8,
+  "rows": 6,
+  "pieces": [
+    { "name": "terrain", "file": "terrain.png", "at": [0, 0], "size": [4, 4] },
+    { "name": "fence", "file": "fence.png", "at": [4, 0], "size": [2, 1], "crop": true, "blocks": 1 },
+    { "name": "rock", "file": "rock.png", "at": [6, 0], "size": [1, 1], "crop": true, "blocks": 1 },
+    { "name": "crate", "file": "crate.png", "at": [7, 0], "size": [1, 2], "crop": true, "blocks": 1 },
+    { "name": "bush", "file": "bush.png", "at": [4, 1], "size": [2, 2], "crop": true, "blocks": 1 },
+    { "name": "tree", "file": "tree.png", "at": [6, 2], "size": [2, 2], "crop": true, "blocks": 1 },
+    { "name": "shed", "file": "shed.png", "at": [4, 3], "size": [2, 3], "crop": true, "blocks": 1 }
+  ]
+}
