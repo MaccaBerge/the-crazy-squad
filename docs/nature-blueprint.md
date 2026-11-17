@@ -166,7 +166,13 @@ All of these use the same `wind()`:
 - **Bushes:** small PixelLab images on the `Trees` layer, swaying like a small tree. They block movement like a trunk.
 - **Flowers:** a grass blade type (a stalk with a flower on top in berry, violet or autumn), scattered in grass areas and pushed like grass.
 - **Reeds:** a tall grass blade type for the water's edge, ready for the water blueprint.
-- **Hanging things:** signs, washing lines and flags in the neighbourhood. A few frames each, swinging further the stronger the wind.
+- **Hanging things:** signs, flags and washing lines, drawn by code on the palette (`src/nature/hangingShapes.ts`) and placed on a **`Hanging` object layer** in Tiled. The map test checks their types and shapes.
+  - **Sign** (a point where the post meets the ground): a plank hanging from an arm on two chains. The plank is stiff, so it moves as one piece; only the chains slant.
+  - **Flag** (a point): the cloth streams out on the downwind side of the pole and ripples a little faster in strong wind (kept slow and low: a faster or higher ripple flickers). In still air it hangs limp, bunched against the pole. It flies to the side the weather blows to; when the wind at it dips the other way for a moment it goes limp rather than flipping, and when the weather turns it sags in before it swings over (`flagStep`).
+  - **Washing line** (a rectangle whose bottom edge runs between the two posts): a sagging rope with a shirt, socks, a towel and a sheet pegged along it, repeated to fill the width. Each piece swings on its own.
+  - **Swinging:** every swinging piece is a pendulum pulled towards the sideways wind (`swingStep`). It overshoots and swings back, so gusts set it rocking, and it lies still in calm air.
+  - **Drawing:** each object has its own small canvas, redrawn only when its pixels change.
+  - **Not yet:** posts don't block movement, and the art could later be swapped for PixelLab pieces.
 
 ---
 
@@ -182,6 +188,8 @@ src/nature/
   leafClumps.ts  cutting a canopy into clumps, and how far each moves   + leafClumps.test.mjs
   leafFall.ts    how a falling leaf moves, and how fast trees shed   + leafFall.test.ts
   leaves.ts      dropping, drawing and recycling falling leaves
+  hangingShapes.ts  drawings and pendulum swing of signs, flags, washing lines   + hangingShapes.test.ts
+  hanging.ts     placing and swinging them from the Hanging layer
   trees.ts       placing, swaying and fading trees
 art/nature/
   blades/        blade poses (on the palette)
@@ -202,7 +210,7 @@ art/trees/
 5. **Real blade art** on the cool ramps, plus flowers and reeds.
 6. **Trees:** two PixelLab trees, leaf-clump sway, trunk collision, canopy fade. Then more tree types (mostly smaller) and bushes.
 7. **Falling leaves.**
-8. **Hanging things** for the neighbourhood.
+8. **Hanging things:** signs, flags and washing lines.
 9. **Weather look:** tint and darkness per preset.
 
 Each step is its own PR.
