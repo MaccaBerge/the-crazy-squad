@@ -3,7 +3,7 @@ import { DEPTH } from '../world/constants';
 import { FADE, LIE, type Leaf, leafDrawn, shedRate, stepLeaf, swing } from './leafFall';
 import type { LeafSource } from './trees';
 import type { WindParams } from './weather';
-import { wind } from './wind';
+import { windAt } from './wind';
 
 // Falling leaves (nature blueprint §5): trees (and later bushes) drop leaves from their canopy at their own `shed`
 // rate, more in strong wind. Each leaf takes the colour of the canopy pixel it left, tumbles through three tiny poses
@@ -61,8 +61,8 @@ export class FallingLeaves {
 
   update(t: number, dt: number, weather: WindParams) {
     this.sources.forEach((src, i) => {
-      const w = wind(src.left + 80, src.top + 40, t, weather);
-      this.due[i] += shedRate(src.shed, w) * dt;
+      const v = windAt(src.left + 80, src.top + 40, t, weather);
+      this.due[i] += shedRate(src.shed, Math.hypot(v.x, v.y)) * dt;
       while (this.due[i] >= 1) this.due[i]--, this.drop(src, t);
     });
     this.live = this.live.filter(({ leaf, sprite }) => {

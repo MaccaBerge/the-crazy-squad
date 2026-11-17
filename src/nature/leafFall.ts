@@ -3,7 +3,7 @@
 // downwind. Pure, so it's testable; leaves.ts draws it.
 
 import type { WindParams } from './weather';
-import { wind } from './wind';
+import { windAt } from './wind';
 
 export interface Leaf {
   x: number; // world position of the ground under the leaf
@@ -26,10 +26,9 @@ export const swing = (l: Leaf, t: number) => Math.sin(l.phase + t * SWING_RATE);
 /** Moves a leaf on by dt seconds. Returns false once it has faded away. */
 export function stepLeaf(l: Leaf, t: number, dt: number, weather: WindParams) {
   if (l.z <= 0) return (l.age += dt) < LIE + FADE;
-  const w = wind(l.x, l.y - l.z, t, weather);
-  const dir = (weather.windDir * Math.PI) / 180;
-  l.x += Math.cos(dir) * w * DRIFT * dt;
-  l.y += Math.sin(dir) * w * DRIFT * dt;
+  const w = windAt(l.x, l.y - l.z, t, weather);
+  l.x += w.x * DRIFT * dt;
+  l.y += w.y * DRIFT * dt;
   const s = swing(l, t);
   l.z = Math.max(0, l.z - FALL * (0.35 + 0.65 * Math.sqrt(1 - s * s)) * dt); // hangs at each end of the swing
   return true;

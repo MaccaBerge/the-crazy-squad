@@ -4,7 +4,7 @@ import { TILE } from '../world/constants';
 import { type BladeKind, CELL, drawShape, MAX_POSE, pickShape, SHAPES } from './bladeShapes';
 import type { Force } from './forces';
 import type { WindParams } from './weather';
-import { wind } from './wind';
+import { windAt } from './wind';
 
 // Moving grass (nature blueprint §4). Every blade is one member of a single SpriteGPULayer, sorted back to front.
 // Bending switches the blade's frame between pre-drawn lean poses, so blades stay pixel perfect.
@@ -229,7 +229,6 @@ export class Grass {
   /** Re-poses the blades in view whose pose changed. Returns how many changed, for the stress test readout. */
   update(view: Phaser.Geom.Rectangle, t: number, dt: number, weather: WindParams, forces: readonly Force[]) {
     this.applyForces(forces, Math.min(dt, 0.05)); // a long frame (tab in the background) would make the spring blow up
-    const side = Math.cos((weather.windDir * Math.PI) / 180); // blades lean left/right only
     let changed = 0;
     const c0 = Math.max(0, Math.floor((view.x - VIEW_MARGIN) / CHUNK)), c1 = Math.min(this.cols - 1, Math.floor((view.right + VIEW_MARGIN) / CHUNK));
     const r0 = Math.max(0, Math.floor((view.y - VIEW_MARGIN) / CHUNK)), r1 = Math.floor((view.bottom + CELL.h) / CHUNK);
@@ -237,7 +236,7 @@ export class Grass {
       for (let col = c0; col <= c1; col++) {
         const members = this.chunks.get(row * this.cols + col);
         if (!members) continue;
-        const w = wind(col * CHUNK + CHUNK / 2, row * CHUNK + CHUNK / 2, t, weather) * side;
+        const w = windAt(col * CHUNK + CHUNK / 2, row * CHUNK + CHUNK / 2, t, weather).x; // blades lean left/right only
         for (const i of members) {
           const b = this.blades[i];
           const pose = poseFor(b.lean, b.flex, w, this.push[i]);

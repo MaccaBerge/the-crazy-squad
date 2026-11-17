@@ -21,9 +21,9 @@ test('a leaf falls to the ground in a few seconds, then lies there and fades', (
 });
 
 test('in still air it swings back and forth without drifting', () => {
-  const still = { windBase: 0, windGust: 0, gustEvery: 10, windDir: 0 };
+  const still = { windBase: 0, windGust: 0, gustEvery: 10, windDir: 0, windVeer: 0 };
   const { l, xs } = drop(still);
-  expect(l.x).toBe(0);
+  expect(Math.abs(l.x)).toBe(0); // -0 is still
   const turns = xs.filter((x, i) => i > 1 && Math.sign(x - xs[i - 1]) !== Math.sign(xs[i - 1] - xs[i - 2]) && x !== xs[i - 1]).length;
   expect(turns).toBeGreaterThanOrEqual(2);
 });
@@ -36,7 +36,7 @@ test('the wind carries it downwind, further in a storm', () => {
 
 test('it hangs at the ends of its swing and falls fastest through the middle', () => {
   const l: Leaf = { x: 0, y: 0, z: 50, phase: Math.PI / 2, age: 0 }; // starts at the end of a swing
-  const still = { windBase: 0, windGust: 0, gustEvery: 10, windDir: 0 };
+  const still = { windBase: 0, windGust: 0, gustEvery: 10, windDir: 0, windVeer: 0 };
   expect(Math.abs(swing(l, 0))).toBeCloseTo(1);
   stepLeaf(l, 0, 0.1, still);
   const atEnd = 50 - l.z;
