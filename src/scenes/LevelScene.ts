@@ -38,6 +38,7 @@ const HURT = 0.18; // seconds a hit pushes you around before your input counts a
 export const tuning = {
   walkSpeed: 62, sprintSpeed: 115, accel: defaultMove.accel, decel: defaultMove.decel, ...defaultStamina,
   cameraLerp: 0.15, lookahead: 24, swapCooldown: 4, animSpeed: 1,
+  iframes: 0.8, swapSafe: 0.3, // s: can't be hit again after a hit / right after swapping in
   ...WEATHER[DEFAULT_WEATHER], // replaced by the map's weather on load
 };
 
@@ -54,7 +55,7 @@ function offStage(s: CharSprite) {
 }
 
 export class LevelScene extends Phaser.Scene {
-  private party = new Party(SQUAD, tuning);
+  private party!: Party;
   private controller = new LocalController();
   private sprites: CharSprite[] = [];
   private rig!: CameraRig;
@@ -94,6 +95,10 @@ export class LevelScene extends Phaser.Scene {
   }
 
   create() {
+    // A restart (whole squad down) reuses this scene object, so everything per-run starts fresh here.
+    this.party = new Party(SQUAD, tuning);
+    this.brains = [];
+    this.hurt = 0;
     const { map, colliders } = loadMap(this, MAP);
     const weather = (map.properties as { name: string; value: unknown }[]).find((p) => p.name === 'weather')?.value;
     Object.assign(tuning, WEATHER[isWeather(weather) ? weather : DEFAULT_WEATHER]);
@@ -179,7 +184,8 @@ export class LevelScene extends Phaser.Scene {
     if (swap) this.trySwap(swap);
 
     const s = this.active;
-    for (const d of this.brains) d.step(dt, s, tuning, (push) => this.hit(push));
+    for (const d of this.brains) d.step(dt, s, tuning, (push, damage) => this.hit(push, damage));
+    if (!this.active.active) return; // squad wiped, restarting
     if (this.hurt > 0) {
       // Knocked back: the push fades out and your input waits, so the hit reads.
       this.hurt = Math.max(0, this.hurt - dt);
@@ -208,9 +214,12 @@ export class LevelScene extends Phaser.Scene {
     const result = this.party.trySwap(this.party.targetFor(action), (def) => this.fits(def, from.x, from.y));
     // A press that lands on the cooldown stays buffered, so pressing just before it ends still swaps.
     if (result !== 'cooldown') this.controller.consume(action);
-    if (result === 'no-room') this.flash(from, 0xff4040);
-    if (result !== 'ok') return;
+    if (result === 'no-room' || result === 'downed') this.flash(from, 0xff4040);
+    if (result === 'ok') this.swapIn(from);
+  }
 
+  /** The party already switched members: put the new one where `from` stood. */
+  private swapIn(from: CharSprite) {
     const to = this.active;
     const { x: vx, y: vy } = from.body.velocity;
     offStage(from);
@@ -227,12 +236,24 @@ export class LevelScene extends Phaser.Scene {
     return r.x >= w.x && r.x + r.w <= w.right && r.y >= w.y && r.y + r.h <= w.bottom && rectFree(r, this.solid);
   }
 
-  /** A dog's attack landed on the active character. */
-  // shortcut: no health or damage yet, only the push and a red flash; build the hit pipeline (collision blueprint §7) next.
-  private hit(push: Vec) {
+  /** A dog's attack reached the active character (collision blueprint §7): damage, knockback, flash, maybe going down. */
+  private hit(push: Vec, damage: number) {
+    const i = this.party.activeIndex, health = this.party.health[i];
+    if (!health.take(damage, tuning.iframes)) return; // invincible: no push either
     this.hurt = HURT;
     this.knock = push;
     this.flash(this.active, 0xb4443a);
+    if (!health.down) return;
+    // Down: forced swap to the next one standing, ignoring the cooldown (players blueprint §2). Nobody left: start over.
+    const from = this.active;
+    this.hurt = 0;
+    if (this.party.forceSwap()) return this.swapIn(from);
+    // shortcut: no checkpoints yet, so a wipe restarts the level; restart from the last checkpoint once they exist.
+    offStage(from);
+    this.time.delayedCall(800, () => {
+      this.scene.stop('hud');
+      this.scene.restart();
+    });
   }
 
   private flash(s: CharSprite, color: number) {
@@ -243,6 +264,8 @@ export class LevelScene extends Phaser.Scene {
   update(_time: number, delta: number) {
     const s = this.active;
     s.setDepth(DEPTH.actors + s.y); // y-sort by feet
+    // Invincibility frames show as flicker.
+    s.setAlpha(this.party.health[this.party.activeIndex].invulnerable && Math.floor(this.time.now / 60) % 2 ? 0.3 : 1);
     const { sprite } = this.party.active;
     // Placeholders show facing with a dot; real art shows it with the animation.
     this.facingDot.setVisible(!sprite).setPosition(s.x + this.facing.x * 5, s.y - 14 + this.facing.y * 5).setDepth(s.depth + 0.5);

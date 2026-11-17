@@ -37,8 +37,8 @@ export class DogAI {
       .setOrigin(0.5, 1).setDepth(DEPTH.ui).setVisible(false);
   }
 
-  /** Fixed physics step: think, then move. `onHit` fires once per attack that lands, with the push direction. */
-  step(dt: number, target: { x: number; y: number } | undefined, t: DogTuning, onHit: (push: Vec) => void) {
+  /** Fixed physics step: think, then move. `onHit` fires once per attack that reaches the target, with the push and damage. */
+  step(dt: number, target: { x: number; y: number } | undefined, t: DogTuning, onHit: (push: Vec, damage: number) => void) {
     const s = this.sprite, b = this.breed;
     const to = target && { x: target.x - s.x, y: target.y - s.y };
     const dist = to ? Math.hypot(to.x, to.y) : null;
@@ -59,7 +59,7 @@ export class DogAI {
       const hx = s.x + this.aim.x * b.lunge.reach, hy = s.y + this.aim.y * b.lunge.reach;
       if (Math.hypot(target.x - hx, target.y - hy) <= b.lunge.radius) {
         this.landed = true;
-        onHit({ x: this.aim.x * b.lunge.knockback, y: this.aim.y * b.lunge.knockback });
+        onHit({ x: this.aim.x * b.lunge.knockback, y: this.aim.y * b.lunge.knockback }, b.lunge.damage);
       }
     }
   }
