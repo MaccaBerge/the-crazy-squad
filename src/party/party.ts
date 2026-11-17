@@ -1,5 +1,6 @@
 import type { CharacterDef } from '../characters/types';
 import type { Action } from '../input/actions';
+import { Stamina, type StaminaTuning } from './stamina';
 
 export const SWAP_ACTIONS = ['swapNext', 'swapPrev', 'swap1', 'swap2', 'swap3', 'swap4'] as const satisfies readonly Action[];
 export type SwapAction = (typeof SWAP_ACTIONS)[number];
@@ -12,11 +13,15 @@ export type SwapResult = 'ok' | 'cooldown' | 'same' | 'no-room';
 export class Party {
   activeIndex = 0;
   cooldownLeft = 0;
+  /** One per member, kept and refilling while off stage. */
+  readonly stamina: Stamina[];
 
   constructor(
     readonly members: readonly CharacterDef[],
-    private readonly tuning: { swapCooldown: number },
-  ) {}
+    private readonly tuning: { swapCooldown: number } & StaminaTuning,
+  ) {
+    this.stamina = members.map(() => new Stamina(tuning));
+  }
 
   get active() {
     return this.members[this.activeIndex];
@@ -27,9 +32,11 @@ export class Party {
     return this.tuning.swapCooldown > 0 ? this.cooldownLeft / this.tuning.swapCooldown : 0;
   }
 
-  tick(dt: number) {
+  /** `sprinting`: the active member holds sprint while moving. Returns whether they actually sprint this step. */
+  tick(dt: number, sprinting = false): boolean {
     this.cooldownLeft -= dt;
     if (this.cooldownLeft < 1e-6) this.cooldownLeft = 0; // float leftovers from many small steps
+    return this.stamina.map((s, i) => s.tick(dt, sprinting && i === this.activeIndex))[this.activeIndex];
   }
 
   /** The member index a swap action asks for. */

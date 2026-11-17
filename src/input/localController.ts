@@ -1,5 +1,5 @@
 import { ACTIONS, type Action } from './actions';
-import { ACTION_KEYS, MOVE_KEYS } from './bindings';
+import { ACTION_KEYS, MOVE_KEYS, SPRINT_KEYS } from './bindings';
 import type { Intent } from './intent';
 
 /** How long a press stays usable if the action isn't possible yet (players blueprint §4). */
@@ -8,7 +8,7 @@ export const BUFFER_MS = 120;
 const actionFor = (combo: string, code: string) =>
   ACTIONS.find((a) => ACTION_KEYS[a].includes(combo)) ?? ACTIONS.find((a) => ACTION_KEYS[a].includes(code));
 
-const ALL_CODES = new Set([...Object.values(MOVE_KEYS).flat(), ...Object.values(ACTION_KEYS).flat().map((k) => k.replace('Shift+', ''))]);
+const ALL_CODES = new Set([...Object.values(MOVE_KEYS).flat(), ...SPRINT_KEYS, ...Object.values(ACTION_KEYS).flat().map((k) => k.replace('Shift+', ''))]);
 
 /** Keyboard → Intent for the character the person at this computer controls. */
 export class LocalController {
@@ -36,6 +36,7 @@ export class LocalController {
     const down = (dir: keyof typeof MOVE_KEYS) => MOVE_KEYS[dir].some((c) => this.held.has(c));
     return {
       move: { x: Number(down('right')) - Number(down('left')), y: Number(down('down')) - Number(down('up')) },
+      sprint: SPRINT_KEYS.some((c) => this.held.has(c)),
       pressed: new Set(this.buffer.keys()),
     };
   }

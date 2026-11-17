@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { type Dir, sheetDir, snapDir } from '../art/facing';
 import { characterTexture, FRAME, makePlaceholderTextures } from '../art/placeholders';
 import { createAnims, preloadSprites } from '../art/sprites';
+import { defaultStamina } from '../party/stamina';
 import { CameraRig } from '../camera/cameraRig';
 import { SQUAD } from '../characters';
 import type { CharacterDef } from '../characters/types';
@@ -17,7 +18,12 @@ const MAP = 'test';
 const NUDGE_SPEED = 0.6; // corner assist sideways speed, as a share of top speed
 
 /** Live-tunable values (T panel). Character stats multiply the movement values. */
-export const tuning = { ...defaultMove, cameraLerp: 0.15, lookahead: 24, swapCooldown: 4 };
+// Walking is the default; holding sprint raises speed to sprintSpeed while stamina lasts.
+// animSpeed: multiplier on walk/run playback, to match feet to ground.
+export const tuning = {
+  walkSpeed: 62, sprintSpeed: 115, accel: defaultMove.accel, decel: defaultMove.decel, ...defaultStamina,
+  cameraLerp: 0.15, lookahead: 24, swapCooldown: 4, animSpeed: 1,
+};
 
 type CharSprite = Phaser.Physics.Arcade.Sprite & { body: Phaser.Physics.Arcade.Body };
 
@@ -39,6 +45,10 @@ export class LevelScene extends Phaser.Scene {
   private solid!: SolidAt;
   private facing = { x: 0, y: 1 };
   private dir: Dir = 'down';
+  private sprinting = false;
+  private staminaBar!: Phaser.GameObjects.Graphics;
+  private sweat: { x: number; y: number; vx: number; vy: number; age: number }[] = [];
+  private nextSweat = 0;
   private facingDot!: Phaser.GameObjects.Image;
 
   constructor() {
@@ -74,6 +84,7 @@ export class LevelScene extends Phaser.Scene {
     onStage(this.active, spawn.x, spawn.y);
     this.physics.add.collider(this.sprites, colliders);
     this.facingDot = this.add.image(0, 0, 'dot');
+    this.staminaBar = this.add.graphics().setDepth(DEPTH.effects);
 
     this.rig = new CameraRig(this.cameras.main, tuning);
     this.rig.follow(this.active);
@@ -90,25 +101,25 @@ export class LevelScene extends Phaser.Scene {
       if (!world.drawDebug) world.debugGraphic?.clear();
     });
 
-    this.add
-      .text(4, 4, 'WASD move · Tab/1-4 swap · T tuning · B boxes', { fontFamily: 'monospace', fontSize: '8px', color: '#fff' })
-      .setScrollFactor(0)
-      .setDepth(DEPTH.ui);
     this.scene.launch('hud', { party: this.party });
   }
 
-  private moveParams(def: CharacterDef) {
-    return { maxSpeed: tuning.maxSpeed * def.stats.speed, accel: tuning.accel * def.stats.accel, decel: tuning.decel * def.stats.accel };
+  private moveParams(def: CharacterDef, sprint = false) {
+    return { maxSpeed: (sprint ? tuning.sprintSpeed : tuning.walkSpeed) * def.stats.speed, accel: tuning.accel * def.stats.accel, decel: tuning.decel * def.stats.accel };
   }
 
   private step(dt: number) {
     const intent = this.controller.getIntent(performance.now());
-    this.party.tick(dt);
+    // Only drain while actually moving: holding Shift against a wall shouldn't tire you out.
+    const moving = !!(intent.move.x || intent.move.y) && this.active.body.velocity.length() > 5;
+    this.sprinting = this.party.tick(dt, intent.sprint && moving);
     const swap = SWAP_ACTIONS.find((a) => intent.pressed.has(a));
     if (swap) this.trySwap(swap);
 
     const s = this.active;
-    const p = this.moveParams(this.party.active);
+    const p = this.moveParams(this.party.active, this.sprinting);
+    // Exhausted (bar just ran dry): walk slower. Animation speed still compares to the normal walk, so the legs look heavy.
+    p.maxSpeed *= this.party.stamina[this.party.activeIndex].speedFactor;
     const v = stepVelocity(s.body.velocity, intent.move, dt, p);
     const b = s.body;
     const nudge = cornerNudge({ x: b.x, y: b.y, w: b.width, h: b.height }, intent.move, b.blocked, this.solid);
@@ -159,10 +170,48 @@ export class LevelScene extends Phaser.Scene {
     // Placeholders show facing with a dot; real art shows it with the animation.
     this.facingDot.setVisible(!sprite).setPosition(s.x + this.facing.x * 5, s.y - 14 + this.facing.y * 5).setDepth(s.depth + 0.5);
     if (sprite) {
-      const moving = s.body.velocity.length() > 5;
+      const speed = s.body.velocity.length();
       const { row, flip } = sheetDir(this.dir);
-      s.setFlipX(flip).play(`${sprite}/${moving ? 'walk' : 'idle'}-${row}`, true);
+      const run = `${sprite}/run-${row}`;
+      const running = this.sprinting && this.anims.exists(run);
+      const key = running ? run : `${sprite}/${speed > 5 ? 'walk' : 'idle'}-${row}`;
+      s.setFlipX(flip).play(key, true);
+      // Playback follows speed, so feet don't slide while speeding up or slowing down. Full rate at sprint speed for the
+      // run and at walk speed for the walk (a character without a run plays its walk faster while sprinting).
+      const full = this.moveParams(this.party.active, running).maxSpeed;
+      s.anims.timeScale = speed > 5 ? Phaser.Math.Clamp((speed / full) * tuning.animSpeed, 0.3, 2) : 1;
     }
-    this.rig.update(s.body.velocity, this.moveParams(this.party.active).maxSpeed, delta / 1000);
+    this.rig.update(s.body.velocity, this.moveParams(this.party.active, this.sprinting).maxSpeed, delta / 1000);
+    this.drawStamina(s, delta / 1000);
   }
+
+  /** A thin bar under the active character's feet, hidden while full. Red while winded, flashing while exhausted. */
+  private drawStamina(s: CharSprite, dt: number) {
+    const st = this.party.stamina[this.party.activeIndex];
+    const g = this.staminaBar.clear();
+    this.drawSweat(g, s, st.exhausted, dt);
+    if (st.value >= 1) return;
+    const w = 14, x = Math.round(s.x - w / 2), y = Math.round(s.y + 2);
+    const flashOff = st.exhausted && Math.floor(this.time.now / 150) % 2 === 1;
+    g.fillStyle(flashOff ? 0x7a2a36 : 0x241520).fillRect(x - 1, y - 1, w + 2, 4);
+    g.fillStyle(st.winded ? 0xb4443a : 0xf2a846).fillRect(x, y, Math.round(w * st.value), 2);
+  }
+
+  /** Sweat drops popping off the head while exhausted: 1×2 px, light water blues from the palette. */
+  private drawSweat(g: Phaser.GameObjects.Graphics, s: CharSprite, exhausted: boolean, dt: number) {
+    if (exhausted && this.time.now >= this.nextSweat) {
+      const side = Math.random() < 0.5 ? -1 : 1;
+      this.sweat.push({ x: s.x + side * 5, y: s.y - 26, vx: side * (10 + Math.random() * 10), vy: -30, age: 0 });
+      this.nextSweat = this.time.now + 250;
+    }
+    this.sweat = this.sweat.filter((d) => (d.age += dt) < 0.45);
+    for (const d of this.sweat) {
+      d.vy += 160 * dt;
+      d.x += d.vx * dt;
+      d.y += d.vy * dt;
+      g.fillStyle(0x8edcf2).fillRect(Math.round(d.x), Math.round(d.y), 1, 2);
+      g.fillStyle(0xe6faf6).fillRect(Math.round(d.x), Math.round(d.y), 1, 1);
+    }
+  }
+
 }
