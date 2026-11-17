@@ -1,7 +1,7 @@
-/** Dev panel with one slider per value; edits `values` in place. Toggle with the T key. Returns `sync`, to redraw the sliders after changing `values` from outside. */
+/** Dev panel with one slider per value that has a range (values without one, like colours, get none); edits `values` in place. Toggle with the T key. Returns `sync`, to redraw the sliders after changing `values` from outside. */
 export function tuningPanel<T extends Record<string, number>>(
   values: T,
-  ranges: { [K in keyof T]: [min: number, max: number, step: number] },
+  ranges: { [K in keyof T]?: [min: number, max: number, step: number] },
 ) {
   const defaults = { ...values };
   const panel = document.createElement('div');
@@ -10,7 +10,7 @@ export function tuningPanel<T extends Record<string, number>>(
 
   const rows: (() => void)[] = [];
   for (const key of Object.keys(ranges) as (keyof T & string)[]) {
-    const [min, max, step] = ranges[key];
+    const [min, max, step] = ranges[key]!;
     const label = document.createElement('label');
     label.style.cssText = 'display:grid;grid-template-columns:90px 140px 50px;gap:6px;align-items:center';
     const slider = Object.assign(document.createElement('input'), { type: 'range', min, max, step });

@@ -46,7 +46,7 @@ A preset is plain data, in `src/nature/weather.ts`:
 interface WindParams { windBase: number; windGust: number; gustEvery: number; windDir: number }
 ```
 
-The light tint and darkness get added to presets in build step 9.
+Each preset has a `light` colour: calm `#ffffff`, sunny `#fff0d8`, breezy `#fdfcf6`, overcast `#c6cede`, storm `#8590b2`. A rectangle over the camera view multiplies the level by it, under effects and above everything else; the HUD is its own scene, so it stays untinted. When the preset changes, the light fades to the new colour over two seconds (`src/nature/weatherLook.ts`).
 
 Rain, falling leaves and lightning are extras for later. The tint and darkness use one camera-wide colour multiply, so the palette rule still holds for the art itself.
 

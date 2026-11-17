@@ -14,6 +14,7 @@ import { DEFAULT_WEATHER, isWeather, WEATHER } from '../nature/weather';
 import { footForce } from '../nature/forces';
 import { bladesFromMap, Grass, scatter } from '../nature/grass';
 import { Hanging } from '../nature/hanging';
+import { WeatherLook } from '../nature/weatherLook';
 import { FallingLeaves } from '../nature/leaves';
 import { preloadTrees, Trees } from '../nature/trees';
 import { gust, windAt } from '../nature/wind';
@@ -65,6 +66,7 @@ export class LevelScene extends Phaser.Scene {
   private trees!: Trees;
   private leaves!: FallingLeaves;
   private hanging!: Hanging;
+  private look!: WeatherLook;
   private readout?: HTMLDivElement;
 
   constructor() {
@@ -117,6 +119,7 @@ export class LevelScene extends Phaser.Scene {
     this.physics.add.collider(this.sprites, [...colliders, ...this.trees.bodies]);
     this.leaves = new FallingLeaves(this, this.trees.sources);
     this.hanging = new Hanging(this, map.getObjectLayer('Hanging')?.objects ?? []);
+    this.look = new WeatherLook(this, tuning.light);
     this.facingDot = this.add.image(0, 0, 'dot');
     this.staminaBar = this.add.graphics().setDepth(DEPTH.effects);
 
@@ -225,6 +228,7 @@ export class LevelScene extends Phaser.Scene {
     this.trees.update(this.time.now / 1000, delta / 1000, tuning, s);
     this.leaves.update(this.time.now / 1000, Math.min(delta / 1000, 0.05), tuning);
     this.hanging.update(this.time.now / 1000, Math.min(delta / 1000, 0.05), tuning);
+    this.look.update(Math.min(delta / 1000, 0.05), tuning.light);
     if (this.grass) {
       const start = performance.now();
       const forces = [footForce(s.x, s.y, this.party.active.body.w)];
