@@ -203,6 +203,6 @@ Each step is its own PR.
 
 ## Sources
 
-- DaFluffyPotato's pygame-grass (MIT): blade images, tile caching, `apply_force`, wind as a sine over time and position, darkening with lean. Tree sway by pixel-row shifting from his videos.
+- DaFluffyPotato's pygame-grass (MIT): blade images, tile caching, `apply_force`, wind as a sine over time and position, darkening with lean. Tree sway by moving leaf clumps, from his foliage animation.
 - Slynyrd, *Pixelblog 44: Top Down Trees* (2023): leaf bundles, sphere shading, light-order layering, trunk and shadow.
 - Phaser 4 `SpriteGPULayer` docs: per-member frames, large member counts.
