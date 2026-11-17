@@ -11,12 +11,15 @@ import { LocalController } from '../input/localController';
 import { defaultMove, stepVelocity } from '../movement';
 import { Party, SWAP_ACTIONS, type SwapAction } from '../party/party';
 import { DEFAULT_WEATHER, isWeather, WEATHER } from '../nature/weather';
+import { Grass, scatter } from '../nature/grass';
 import { gust, wind } from '../nature/wind';
 import { DEPTH, TILE } from '../world/constants';
 import { loadMap, preloadMap } from '../world/loadMap';
 import { spawnEntities } from '../world/spawner';
 
 const MAP = 'test';
+// Dev: ?grass=20000 covers the map in that many blades, with an fps readout (nature blueprint §8, step 2).
+const STRESS_BLADES = Number(new URLSearchParams(location.search).get('grass')) || 0;
 const NUDGE_SPEED = 0.6; // corner assist sideways speed, as a share of top speed
 
 /** Live-tunable values (T panel). Character stats multiply the movement values. */
@@ -54,6 +57,8 @@ export class LevelScene extends Phaser.Scene {
   private nextSweat = 0;
   private facingDot!: Phaser.GameObjects.Image;
   private windView!: Phaser.GameObjects.Graphics;
+  private grass?: Grass;
+  private readout?: HTMLDivElement;
 
   constructor() {
     super('level');
@@ -75,6 +80,14 @@ export class LevelScene extends Phaser.Scene {
     this.solid = (tx, ty) => colliders.some((l) => l.getTileAt(tx, ty)?.collides);
     makePlaceholderTextures(this, SQUAD);
     createAnims(this, SQUAD);
+
+    if (STRESS_BLADES) {
+      const blades = scatter({ x: 0, y: 0, w: map.widthInPixels, h: map.heightInPixels }, STRESS_BLADES, 1);
+      this.grass = new Grass(this, blades, map.widthInPixels, DEPTH.Decor + 1);
+      this.readout = document.body.appendChild(document.createElement('div'));
+      this.readout.style.cssText = 'position:fixed;bottom:8px;right:8px;padding:4px 8px;background:#000a;color:#fff;font:13px monospace;border-radius:4px;pointer-events:none';
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.readout?.remove());
+    }
 
     let spawn = { x: map.widthInPixels / 2, y: map.heightInPixels / 2 };
     spawnEntities(map, { PlayerSpawn: (o) => (spawn = { x: o.x ?? spawn.x, y: o.y ?? spawn.y }) });
@@ -196,6 +209,13 @@ export class LevelScene extends Phaser.Scene {
     this.rig.update(s.body.velocity, this.moveParams(this.party.active, this.sprinting).maxSpeed, delta / 1000);
     this.drawStamina(s, delta / 1000);
     if (this.windView.visible) this.drawWind();
+    if (this.grass) {
+      const start = performance.now();
+      const changed = this.grass.update(this.cameras.main.worldView, this.time.now / 1000, tuning);
+      const ms = performance.now() - start;
+      if (this.readout && this.game.getFrame() % 30 === 0)
+        this.readout.textContent = `${STRESS_BLADES} blades · ${changed} re-posed in ${ms.toFixed(2)} ms · ${this.game.loop.actualFps.toFixed(0)} fps`;
+    }
   }
 
   /** One arrow per tile in view: length is the wind's strength, orange where a gust is passing. */
