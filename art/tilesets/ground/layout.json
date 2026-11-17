@@ -1,0 +1,8 @@
+{
+  "columns": 8,
+  "rows": 4,
+  "pieces": [
+    { "name": "water", "file": "water.png", "at": [0, 0], "size": [4, 4] },
+    { "name": "grass", "file": "grass.png", "at": [4, 0], "size": [4, 4] }
+  ]
+}
