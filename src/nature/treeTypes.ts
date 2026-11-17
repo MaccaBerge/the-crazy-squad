@@ -3,7 +3,7 @@
 
 export interface TreeType {
   base: { x: number; y: number }; // where the trunk meets the ground: the tree's position, and its depth like actors' feet
-  block: { w: number; h: number }; // trunk hitbox, centred on base.x, its bottom on base.y
+  block?: { w: number; h: number }; // trunk hitbox, centred on base.x, its bottom on base.y; bushes have none, so you walk through them
   swayFrom: number; // leaf clumps above this row sway; the trunk and the lowest leaves stay put
   sway: number; // px a clump at the top moves at full lean
   litter?: number; // fallen leaves that stay under it as a carpet (autumn trees); the rest lie a while and fade
@@ -17,10 +17,10 @@ const GREEN = {
   'young-oak': { base: { x: 18, y: 43 }, block: { w: 8, h: 4 }, swayFrom: 34, sway: 2, shed: 0.3 },
   'slender-tree': { base: { x: 15, y: 68 }, block: { w: 4, h: 3 }, swayFrom: 45, sway: 2, shed: 0.25 },
   'small-pine': { base: { x: 11, y: 36 }, block: { w: 6, h: 4 }, swayFrom: 33, sway: 1, shed: 0.05 },
-  // Bushes: whole thing sways a little, blocks like a trunk, sheds least.
-  'round-bush': { base: { x: 14, y: 22 }, block: { w: 16, h: 5 }, swayFrom: 23, sway: 1, shed: 0.08 },
-  'berry-bush': { base: { x: 14, y: 25 }, block: { w: 16, h: 5 }, swayFrom: 26, sway: 1, shed: 0.08 },
-  'flowering-bush': { base: { x: 15, y: 26 }, block: { w: 18, h: 5 }, swayFrom: 27, sway: 1, shed: 0.1 },
+  // Bushes: whole thing sways a little, nothing blocks, sheds least.
+  'round-bush': { base: { x: 14, y: 22 }, swayFrom: 23, sway: 1, shed: 0.08 },
+  'berry-bush': { base: { x: 14, y: 25 }, swayFrom: 26, sway: 1, shed: 0.08 },
+  'flowering-bush': { base: { x: 15, y: 26 }, swayFrom: 27, sway: 1, shed: 0.1 },
 } satisfies Record<string, TreeType>;
 
 /** Autumn recolours (art/trees/autumn.mjs): same shape, so the same trunk, hitbox and sway; they shed more and keep a

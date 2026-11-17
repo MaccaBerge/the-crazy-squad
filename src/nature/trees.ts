@@ -91,7 +91,7 @@ export class Trees {
         shed: typeof shed === 'number' ? shed : t.shed,
         litter: t.litter ?? 0,
       });
-      this.bodies.push(scene.physics.add.staticBody(x - t.block.w / 2, y - t.block.h, t.block.w, t.block.h));
+      if (t.block) this.bodies.push(scene.physics.add.staticBody(x - t.block.w / 2, y - t.block.h, t.block.w, t.block.h));
       this.trees.push({ sprite, tex, parts, type: t, offsets: new Int8Array(parts.clumps.length * 2).fill(99), flex: 0.8 + ((o.id * 7919) % 100) / 250 }); // trees differ a little in stiffness
     }
   }
