@@ -5,6 +5,7 @@ export const jonas: CharacterDef = {
   id: 'jonas',
   name: 'Jonas',
   placeholder: { initial: 'J', color: 0x5cc06a },
+  sprite: 'jonas',
   body: { w: 8, h: 5 },
   stats: { speed: 1.1, accel: 1 },
 };

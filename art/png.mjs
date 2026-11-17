@@ -20,6 +20,43 @@ export function png(w, h, rgba) {
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 }
 
+/** Decodes an 8-bit PNG (RGBA, RGB, grey or paletted; no interlacing) to { w, h, px: RGBA bytes }. */
+export function decode(buf) {
+  let p = 8, w, h, type, plte, trns;
+  const idat = [];
+  while (p < buf.length) {
+    const len = buf.readUInt32BE(p), t = buf.toString('ascii', p + 4, p + 8), d = buf.subarray(p + 8, p + 8 + len);
+    if (t === 'IHDR') {
+      [w, h, type] = [d.readUInt32BE(0), d.readUInt32BE(4), d[9]];
+      if (d[8] !== 8 || d[12]) throw new Error(`unsupported PNG: bit depth ${d[8]}, interlace ${d[12]}`);
+    }
+    if (t === 'PLTE') plte = d;
+    if (t === 'tRNS') trns = d;
+    if (t === 'IDAT') idat.push(d);
+    p += 12 + len;
+  }
+  const bpp = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }[type], stride = w * bpp;
+  const raw = zlib.inflateSync(Buffer.concat(idat)), px = new Uint8Array(w * h * 4);
+  let prev = new Uint8Array(stride);
+  for (let y = 0; y < h; y++) {
+    const f = raw[y * (stride + 1)], cur = raw.subarray(y * (stride + 1) + 1, (y + 1) * (stride + 1));
+    for (let i = 0; i < stride; i++) {
+      const a = i >= bpp ? cur[i - bpp] : 0, b = prev[i], c = i >= bpp ? prev[i - bpp] : 0;
+      const pa = Math.abs(b - c), pb = Math.abs(a - c), pc = Math.abs(a + b - 2 * c);
+      cur[i] += [0, a, b, (a + b) >> 1, pa <= pb && pa <= pc ? a : pb <= pc ? b : c][f];
+    }
+    for (let x = 0; x < w; x++) {
+      const o = (y * w + x) * 4, s = x * bpp;
+      if (type === 6) px.set(cur.subarray(s, s + 4), o);
+      else if (type === 2) px.set([...cur.subarray(s, s + 3), 255], o);
+      else if (type === 3) px.set([...plte.subarray(cur[s] * 3, cur[s] * 3 + 3), trns && cur[s] < trns.length ? trns[cur[s]] : 255], o);
+      else px.set([cur[s], cur[s], cur[s], type === 4 ? cur[s + 1] : 255], o);
+    }
+    prev = cur;
+  }
+  return { w, h, px };
+}
+
 /** Packs frames (arrays of equal-length strings, one char per pixel) into a grid; '.' is transparent. */
 export function sheet(frames, palette, size, columns, scale = 1, bg = null) {
   const rows = Math.ceil(frames.length / columns);

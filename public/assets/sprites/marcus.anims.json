@@ -1,0 +1,66 @@
+{
+  "frameWidth": 32,
+  "frameHeight": 32,
+  "anims": {
+    "idle-down": {
+      "frames": [
+        0
+      ],
+      "frameRate": 1
+    },
+    "walk-down": {
+      "frames": [
+        0
+      ],
+      "frameRate": 1
+    },
+    "idle-down-side": {
+      "frames": [
+        1
+      ],
+      "frameRate": 1
+    },
+    "walk-down-side": {
+      "frames": [
+        1
+      ],
+      "frameRate": 1
+    },
+    "idle-side": {
+      "frames": [
+        2
+      ],
+      "frameRate": 1
+    },
+    "walk-side": {
+      "frames": [
+        2
+      ],
+      "frameRate": 1
+    },
+    "idle-up-side": {
+      "frames": [
+        3
+      ],
+      "frameRate": 1
+    },
+    "walk-up-side": {
+      "frames": [
+        3
+      ],
+      "frameRate": 1
+    },
+    "idle-up": {
+      "frames": [
+        4
+      ],
+      "frameRate": 1
+    },
+    "walk-up": {
+      "frames": [
+        4
+      ],
+      "frameRate": 1
+    }
+  }
+}
