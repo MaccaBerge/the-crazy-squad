@@ -54,20 +54,38 @@ Rain, falling leaves and lightning are extras for later. The tint and darkness u
 
 ## 3. Wind
 
-One function, used by everything that sways:
+One wind field, used by everything that sways:
 
 ```ts
-wind(x, y, t, params): number   // -1..1, + leans things in the wind's direction
-gust(x, y, t, params): number   // 0..1, how much of a gust is passing right now
+windAt(x, y, t, params): { x, y }   // the wind vector there, length 0..1 (full strength)
+gust(x, y, t, params): number       // 0..1, how much of a gust is passing right now
+prevailing(t, params): number       // the overall direction right now, radians
 ```
 
-- **Base sway:** two or three sines with different speeds and wavelengths, offset by `x` (and a bit of `y`), so the sway rolls across a field as a wave instead of everything moving together. DaFluffyPotato's version is `sin(t/60 + x/100)`; ours sums a few of those.
-- **Gusts:** wider, stronger bumps that travel across the level in the wind's direction every `gustEvery` seconds. That's what makes a field ripple.
-- **Scaled by the weather preset:** `windBase` and `windGust` from section 2.
-- **Debug view:** V draws one arrow per tile (orange where a gust is passing). The T panel has the wind sliders and a preset switch.
-- **Cheap:** it's sampled per grass tile or per tree, not per blade.
+The wind is alive in three layers, so it never looks like one pulse marching one way:
 
-It lives in `src/nature/wind.ts` with a unit test (same input, same output; stays within range).
+- **Veering:** the prevailing direction wanders slowly around `windDir`, up to `windVeer` degrees either way. Two slow sines, about 30 s and 90 s, so it never loops visibly. Light air wanders most (calm 70°) and a storm least (20°).
+- **Eddies:** a large, slow swirl field, about a screen across, bends the direction from place to place by up to 60% of `windVeer`. It drifts downwind, so you can watch a bend in the wind roll across a field.
+- **Base sway:** two sines with different speeds and wavelengths roll downwind (DaFluffyPotato's `sin(t/60 + x/100)`, summed). The waves and eddies roll along the weather's own `windDir`, so far-off spots don't sweep as the wind veers.
+- **Gust puffs:** each gust is a separate blob, about 140 px long and 300 px wide.
+  - It grows, travels at 70–110 px/s along its own heading (the prevailing wind give or take 50°), and dies out within 5 s.
+  - Every 320 px square of the world releases puffs on its own deterministic clock, so puffs cover a level of any size, and a spot feels about one gust every `gustEvery` seconds.
+  - Gusts push the way their puff heads, so they cross a field at angles.
+- **Weather settings:** `windBase`, `windGust`, `gustEvery`, `windDir` and `windVeer` come from the preset (section 2), and each has a slider in the T panel.
+- **Debug view:** V draws one arrow per tile pointing where the wind blows there (orange where a gust is passing).
+- **Who uses what:**
+  - grass, tree clumps and hanging things lean with the sideways part of the wind (`x`);
+  - falling leaves drift with the whole vector;
+  - trees shed with its strength;
+  - flags fly to the side of the prevailing direction.
+- **Cheap:** it's sampled per grass tile, tree clump, leaf and hanging thing, not per blade; the whole scene stays around 2 ms per frame.
+
+It lives in `src/nature/wind.ts` with unit tests:
+- the same input gives the same output;
+- it stays within full strength and mostly blows its way;
+- the direction veers within `windVeer`;
+- eddies bend it across the land;
+- gusts come and go, travel downwind and head different ways.
 
 ---
 
@@ -92,7 +110,7 @@ It lives in `src/nature/wind.ts` with a unit test (same input, same output; stay
 Each blade's lean is:
 
 ```
-lean = baseLean + wind(x, y, t) * flexibility + push
+lean = baseLean + windAt(x, y, t).x * flexibility + push
 ```
 
 then rounded to the nearest pose.
@@ -161,7 +179,7 @@ A field can hold **tens of thousands of blades**, so:
 
 ## 6. Other things in the wind
 
-All of these use the same `wind()`:
+All of these use the same `windAt()`:
 
 - **Bushes:** small PixelLab images on the `Trees` layer, swaying like a small tree. They block movement like a trunk.
 - **Flowers:** a grass blade type (a stalk with a flower on top in berry, violet or autumn), scattered in grass areas and pushed like grass.
@@ -181,7 +199,7 @@ All of these use the same `wind()`:
 ```
 src/nature/
   weather.ts     presets and the level's current weather
-  wind.ts        wind(x, y, t)          + wind.test.ts
+  wind.ts        windAt(x, y, t), gust, prevailing   + wind.test.ts
   forces.ts      the list of moving bodies that push nature
   grass.ts       scatter, chunks, poses, the GPU layer   + grass.test.ts (scatter is seeded)
   treeTypes.ts   base, hitbox and sway per tree type
