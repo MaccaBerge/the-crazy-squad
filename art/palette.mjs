@@ -20,6 +20,38 @@ export const colors = [...new Set(Object.values(ramps).flatMap((r) => r.colors))
 /** True if 0xRRGGBB is in the palette. */
 export const inPalette = (rgb) => colors.includes(rgb);
 
+/** The outline color for a palette color: its ramp's `outline`, or undefined if it's not in the palette. */
+export const outlineOf = (rgb) => Object.values(ramps).find((r) => r.colors.includes(rgb))?.outline;
+
+/**
+ * Tinted outlines for hand-typed frames: each `o` pixel takes the outline color of the ramp it borders most
+ * (4 neighbours). Returns new frames plus a palette extended with one char per outline color used.
+ */
+export function tintOutlines(frames, palette, o = 'o') {
+  const pal = { ...palette };
+  const charOf = new Map();
+  const charFor = (rgb) => {
+    if (!charOf.has(rgb)) {
+      const k = String.fromCharCode(0x2460 + charOf.size); // ①②③…, never clashes with typed chars
+      charOf.set(rgb, k);
+      pal[k] = rgb;
+    }
+    return charOf.get(rgb);
+  };
+  const out = frames.map((f) => f.map((row, y) => [...row].map((ch, x) => {
+    if (ch !== o) return ch;
+    const n = {};
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const c = f[y + dy]?.[x + dx];
+      if (c && c !== '.' && c !== o) n[c] = (n[c] ?? 0) + 1;
+    }
+    const best = Object.keys(n).sort((a, b) => n[b] - n[a])[0];
+    const rgb = best && outlineOf(pal[best]);
+    return rgb === undefined ? ch : charFor(rgb);
+  }).join('')));
+  return { frames: out, palette: pal };
+}
+
 /** The palette color closest to 0xRRGGBB (plain RGB distance), for snapping generated art onto the palette. */
 export function nearest(rgb) {
   const ch = (c) => [(c >> 16) & 255, (c >> 8) & 255, c & 255];
