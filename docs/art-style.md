@@ -4,6 +4,8 @@ Warm, rich top-down pixel art. Even the darkest colors are warm. Nothing should 
 
 The palette lives in [`art/palette.mjs`](../art/palette.mjs).
 
+Tiles and world objects follow these rules plus the ones in [world-art-style.md](world-art-style.md).
+
 ## Rules
 
 1. **Strict palette.** Every pixel of every asset is a color from `art/palette.mjs`. Generated art (PixelLab or anything else) is snapped onto the palette before it goes in the game.
