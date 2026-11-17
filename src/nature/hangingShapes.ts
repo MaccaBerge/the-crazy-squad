@@ -68,6 +68,24 @@ export function signPixels(angle: number): Px[] {
 const FLAG_POLE = 30;
 const CLOTH = { w: 12, h: 7 };
 
+/** How a flag catches the wind: how far it streams out (0 = limp) and to which side of the pole (+1 right, -1 left). */
+export interface Flag { strength: number; side: number }
+
+const FLAG_EASE = 2; // 1/s: how quickly a flag picks up or loses the wind
+const FLIP_AT = 0.08; // strength below which a limp flag can swing over to the other side
+
+/**
+ * Moves a flag on by dt. `lean` is the sideways wind at the flag (-1..1) and `windSide` the side the weather blows to
+ * (+1, -1, or 0 straight up or down the screen). The flag flies to the weather's side; when the wind at it dips the
+ * other way for a moment it goes limp rather than flipping. When the weather turns, it sags in and then swings over.
+ */
+export function flagStep(f: Flag, lean: number, windSide: number, dt: number, flex = 1) {
+  const turning = windSide !== 0 && windSide !== f.side;
+  const target = turning ? 0 : Math.max(0, Math.min(1, lean * f.side * flex));
+  f.strength += (target - f.strength) * Math.min(1, dt * FLAG_EASE);
+  if (turning && f.strength < FLIP_AT) f.side = windSide;
+}
+
 /** A flag in wind of `strength` 0..1 blowing to `side` (+1 right, -1 left), at time t (the ripple runs along it). */
 export function flagPixels(strength: number, side: number, t: number): Px[] {
   const out = post(0, FLAG_POLE);
@@ -75,11 +93,12 @@ export function flagPixels(strength: number, side: number, t: number): Px[] {
   const s = Math.max(0, Math.min(1, strength));
   const drop = (c: number) => // how far column c (1 = at the pole) hangs below the top of the pole
     Math.round((1 - s) * c * 0.7 + (0.6 + 0.6 * s) * (c / CLOTH.w) * Math.sin(c * 0.5 - t * (3.5 + 2.5 * s))); // a slow, low ripple: faster or higher flickers
-  for (let c = 1; c <= CLOTH.w; c++) {
+  const cols = Math.max(3, Math.round(CLOTH.w * (0.35 + 0.65 * s))); // a limp flag bunches up against the pole
+  for (let c = 1; c <= cols; c++) {
     const dy = drop(c), slope = drop(c + 1) - dy;
     const x = side > 0 ? 1 + c : -c; // out from the pole's downwind side
     for (let r = 0; r < CLOTH.h; r++) {
-      const edge = r === 0 || r === CLOTH.h - 1 || c === CLOTH.w;
+      const edge = r === 0 || r === CLOTH.h - 1 || c === cols;
       const step = edge ? 1 : Math.max(1, Math.min(3, 2 - slope)); // facing up the ripple catches light
       out.push({ x, y: -FLAG_POLE + dy + r, color: RAMPS.berry[step] });
     }

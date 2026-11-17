@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { flagPixels, lineClothes, linePixels, MAX_ANGLE, type Pendulum, signPixels, swingStep } from './hangingShapes';
+import { type Flag, flagPixels, flagStep, lineClothes, linePixels, MAX_ANGLE, type Pendulum, signPixels, swingStep } from './hangingShapes';
 
 const run = (lean: number, seconds: number, p: Pendulum = { a: 0, v: 0 }) => {
   const seen: number[] = [];
@@ -45,4 +45,25 @@ test('clothes fit between the posts of any line', () => {
     expect(Math.min(...xs)).toBe(0);
     expect(Math.max(...xs)).toBe(w + 1);
   }
+});
+
+test('a dip in the wind makes a flag go limp, never flip', () => {
+  const f: Flag = { strength: 0, side: 1 };
+  for (let i = 0; i < 300; i++) flagStep(f, 0.6, 1, 1 / 60);
+  for (let i = 0; i < 120; i++) flagStep(f, -0.3, 1, 1 / 60); // the wind here briefly pushes back
+  expect(f.side).toBe(1);
+  expect(f.strength).toBeLessThan(0.1);
+});
+
+test('when the weather turns, a flag sags in before it swings over', () => {
+  const f: Flag = { strength: 0, side: 1 };
+  for (let i = 0; i < 300; i++) flagStep(f, 0.8, 1, 1 / 60);
+  let flippedAt = -1;
+  for (let i = 0; i < 600; i++) {
+    const before = f.strength;
+    flagStep(f, -0.8, -1, 1 / 60);
+    if (f.side === -1 && flippedAt < 0) (flippedAt = i), expect(before).toBeLessThan(0.1);
+  }
+  expect(flippedAt).toBeGreaterThan(30); // not instantly: it takes a moment to sag
+  expect(f.strength).toBeGreaterThan(0.6); // and then flies out on the new side
 });

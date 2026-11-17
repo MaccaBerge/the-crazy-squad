@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { DEPTH } from '../world/constants';
 import type { MapObject } from '../world/spawner';
-import { flagPixels, isHangingKind, lineClothes, linePixels, type Pendulum, type Px, signPixels, swingStep } from './hangingShapes';
+import { type Flag, flagPixels, flagStep, isHangingKind, lineClothes, linePixels, type Pendulum, type Px, signPixels, swingStep } from './hangingShapes';
 import type { WindParams } from './weather';
 import { wind } from './wind';
 
@@ -9,11 +9,9 @@ import { wind } from './wind';
 // the ground; a washing line is a rectangle whose bottom edge runs between its two posts. Each has its own small canvas,
 // redrawn only when its pixels change.
 
-const FLAG_EASE = 2; // 1/s: how quickly a flag picks up or loses the wind
-
 interface Thing {
   draw: (t: number) => Px[];
-  swing: (lean: number, dt: number) => void;
+  swing: (lean: number, dt: number, windSide: number) => void; // lean: sideways wind here; windSide: the weather's side
   tex: Phaser.Textures.CanvasTexture;
   box: { left: number; top: number };
   x: number;
@@ -35,11 +33,9 @@ export class Hanging {
         const p: Pendulum = { a: 0, v: 0 };
         this.add(o.id, x, y, { left: -6, top: -26, w: 26, h: 26 }, () => signPixels(p.a), (lean, dt) => swingStep(p, lean, dt, flex));
       } else if (o.type === 'flag') {
-        let strength = 0, side = 1;
-        this.add(o.id, x, y, { left: -14, top: -34, w: 30, h: 34 }, (t) => flagPixels(strength, side, t), (lean, dt) => {
-          strength += (Math.min(1, Math.abs(lean) * flex) - strength) * Math.min(1, dt * FLAG_EASE);
-          if (Math.abs(lean) > 0.05) side = Math.sign(lean); // a flag in still air keeps the side it last flew to
-        });
+        const f: Flag = { strength: 0, side: 1 };
+        this.add(o.id, x, y, { left: -14, top: -34, w: 30, h: 34 }, (t) => flagPixels(f.strength, f.side, t),
+          (lean, dt, windSide) => flagStep(f, lean, windSide, dt, flex));
       } else {
         const width = Math.max(24, Math.round(o.width ?? 0));
         const pieces: Pendulum[] = lineClothes(width).map(() => ({ a: 0, v: 0 }));
@@ -60,7 +56,7 @@ export class Hanging {
   update(t: number, dt: number, weather: WindParams) {
     const side = Math.cos((weather.windDir * Math.PI) / 180);
     for (const thing of this.things) {
-      thing.swing(wind(thing.x, thing.y - 20, t, weather) * side, dt);
+      thing.swing(wind(thing.x, thing.y - 20, t, weather) * side, dt, Math.abs(side) < 0.1 ? 0 : Math.sign(side));
       const px = thing.draw(t);
       const h = hash(px);
       if (h === thing.drawn) continue;

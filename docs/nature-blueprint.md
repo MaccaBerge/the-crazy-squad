@@ -168,7 +168,7 @@ All of these use the same `wind()`:
 - **Reeds:** a tall grass blade type for the water's edge, ready for the water blueprint.
 - **Hanging things:** signs, flags and washing lines, drawn by code on the palette (`src/nature/hangingShapes.ts`) and placed on a **`Hanging` object layer** in Tiled. The map test checks their types and shapes.
   - **Sign** (a point where the post meets the ground): a plank hanging from an arm on two chains. The plank is stiff, so it moves as one piece; only the chains slant.
-  - **Flag** (a point): the cloth streams out on the downwind side of the pole and ripples a little faster in strong wind (kept slow and low: a faster or higher ripple flickers). In still air it hangs limp. It picks up and loses the wind over about half a second, and keeps the side it last flew to.
+  - **Flag** (a point): the cloth streams out on the downwind side of the pole and ripples a little faster in strong wind (kept slow and low: a faster or higher ripple flickers). In still air it hangs limp, bunched against the pole. It flies to the side the weather blows to; when the wind at it dips the other way for a moment it goes limp rather than flipping, and when the weather turns it sags in before it swings over (`flagStep`).
   - **Washing line** (a rectangle whose bottom edge runs between the two posts): a sagging rope with a shirt, socks, a towel and a sheet pegged along it, repeated to fill the width. Each piece swings on its own.
   - **Swinging:** every swinging piece is a pendulum pulled towards the sideways wind (`swingStep`). It overshoots and swings back, so gusts set it rocking, and it lies still in calm air.
   - **Drawing:** each object has its own small canvas, redrawn only when its pixels change.
