@@ -10,7 +10,7 @@ export type TileLayerName = (typeof TILE_LAYERS)[number];
 export const COLLISION_LAYERS: readonly TileLayerName[] = ['Ground', 'Walls'];
 
 /** Every layer name a map may use. `Roofs` is a group layer, its children are `Roofs/<building>`. `Grass` holds areas of moving grass, `Trees` points where trunks stand. */
-export const MAP_LAYERS = [...TILE_LAYERS, 'Roofs', 'Entities', 'Zones', 'Grass', 'Trees'] as const;
+export const MAP_LAYERS = [...TILE_LAYERS, 'Roofs', 'Entities', 'Zones', 'Grass', 'Trees', 'Hanging'] as const;
 
 /** Tiled classes allowed on the Entities layer. Each needs a factory where the level spawns entities. */
 export const ENTITY_TYPES = ['PlayerSpawn'] as const;
