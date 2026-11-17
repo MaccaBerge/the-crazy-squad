@@ -77,6 +77,8 @@ describe.each(Object.entries(files))('%s', (_path, raw) => {
     for (const o of map.layers.find((l) => l.name === 'Trees')?.objects ?? []) {
       expect(o.point, `tree ${o.id} must be a point (where the trunk meets the ground)`).toBe(true);
       expect(isTreeName(o.type), `tree ${o.id} has unknown type "${o.type}"; see TREE_TYPES in src/nature/treeTypes.ts`).toBe(true);
+      const shed = o.properties?.find((p) => p.name === 'shed')?.value;
+      if (shed !== undefined) expect(shed, `tree ${o.id} shed (leaves per second)`).toSatisfy((r) => typeof r === 'number' && r >= 0 && r <= 10);
     }
   });
 });
