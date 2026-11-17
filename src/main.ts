@@ -32,4 +32,6 @@ tuningPanel(tuning, {
   cameraLerp: [0.02, 1, 0.01],
   lookahead: [0, 48, 1],
   swapCooldown: [0, 10, 0.5],
+  runAt: [0, 1, 0.05],
+  animSpeed: [0.25, 3, 0.05],
 });

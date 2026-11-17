@@ -17,7 +17,8 @@ const MAP = 'test';
 const NUDGE_SPEED = 0.6; // corner assist sideways speed, as a share of top speed
 
 /** Live-tunable values (T panel). Character stats multiply the movement values. */
-export const tuning = { ...defaultMove, cameraLerp: 0.15, lookahead: 24, swapCooldown: 4 };
+// runAt: share of max speed above which the run plays. animSpeed: multiplier on walk/run playback, to match feet to ground.
+export const tuning = { ...defaultMove, cameraLerp: 0.15, lookahead: 24, swapCooldown: 4, runAt: 0.6, animSpeed: 1 };
 
 type CharSprite = Phaser.Physics.Arcade.Sprite & { body: Phaser.Physics.Arcade.Body };
 
@@ -159,9 +160,16 @@ export class LevelScene extends Phaser.Scene {
     // Placeholders show facing with a dot; real art shows it with the animation.
     this.facingDot.setVisible(!sprite).setPosition(s.x + this.facing.x * 5, s.y - 14 + this.facing.y * 5).setDepth(s.depth + 0.5);
     if (sprite) {
-      const moving = s.body.velocity.length() > 5;
+      const speed = s.body.velocity.length();
+      const max = this.moveParams(this.party.active).maxSpeed;
       const { row, flip } = sheetDir(this.dir);
-      s.setFlipX(flip).play(`${sprite}/${moving ? 'walk' : 'idle'}-${row}`, true);
+      const run = `${sprite}/run-${row}`;
+      const running = speed > max * tuning.runAt && this.anims.exists(run);
+      const key = running ? run : `${sprite}/${speed > 5 ? 'walk' : 'idle'}-${row}`;
+      s.setFlipX(flip).play(key, true);
+      // Playback follows speed, so feet don't slide while speeding up or slowing down. Full rate at max speed for the run,
+      // at the run threshold for the walk (a character without a run keeps speeding its walk up past it).
+      s.anims.timeScale = speed > 5 ? Phaser.Math.Clamp((speed / (running ? max : max * tuning.runAt)) * tuning.animSpeed, 0.3, 2) : 1;
     }
     this.rig.update(s.body.velocity, this.moveParams(this.party.active).maxSpeed, delta / 1000);
   }
