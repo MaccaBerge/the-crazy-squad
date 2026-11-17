@@ -5,7 +5,7 @@ import { defaultStamina } from './stamina';
 
 const fits = () => true;
 
-test('number keys pick a member, Tab cycles both ways and wraps', () => {
+test('number keys pick a member, E/Q cycle both ways and wraps', () => {
   const p = new Party(SQUAD, { swapCooldown: 0, ...defaultStamina });
   expect(p.targetFor('swap3')).toBe(2);
   expect(p.targetFor('swapPrev')).toBe(3);

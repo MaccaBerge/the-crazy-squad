@@ -22,10 +22,10 @@ test('presses are buffered, expire, and fire once when consumed', () => {
   expect(c.getIntent(2000).pressed.has('swap3')).toBe(false);
 });
 
-test('Shift+Tab swaps back, Tab swaps forward', () => {
+test('Q swaps back, E swaps forward, also while sprinting', () => {
   const c = new LocalController();
-  c.keyDown('Tab', true, 0);
-  c.keyDown('Tab', false, 0);
+  c.keyDown('KeyQ', false, 0);
+  c.keyDown('KeyE', true, 0);
   expect([...c.getIntent(0).pressed].sort()).toEqual(['swapNext', 'swapPrev']);
 });
 

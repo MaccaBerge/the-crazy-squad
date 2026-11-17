@@ -50,7 +50,7 @@ export class LocalController {
   attach(target: Window = window) {
     const down = (e: KeyboardEvent) => {
       if (!ALL_CODES.has(e.code)) return;
-      e.preventDefault(); // stop arrows/Space scrolling the page and Tab moving focus
+      e.preventDefault(); // stop arrows/Space scrolling the page
       if (!e.repeat) this.keyDown(e.code, e.shiftKey, performance.now());
     };
     const up = (e: KeyboardEvent) => this.keyUp(e.code);
