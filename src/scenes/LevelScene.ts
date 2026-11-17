@@ -101,10 +101,6 @@ export class LevelScene extends Phaser.Scene {
       if (!world.drawDebug) world.debugGraphic?.clear();
     });
 
-    this.add
-      .text(4, 4, 'WASD move · Shift sprint · Tab/1-4 swap · T tuning · B boxes', { fontFamily: 'monospace', fontSize: '8px', color: '#fff' })
-      .setScrollFactor(0)
-      .setDepth(DEPTH.ui);
     this.scene.launch('hud', { party: this.party });
   }
 
