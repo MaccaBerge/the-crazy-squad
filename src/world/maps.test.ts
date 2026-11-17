@@ -70,7 +70,7 @@ describe.each(Object.entries(files))('%s', (_path, raw) => {
       const flowers = o.properties?.find((p) => p.name === 'flowers')?.value;
       if (flowers !== undefined) expect(flowers, `grass area ${o.id} flowers (share 0–1)`).toSatisfy((f) => typeof f === 'number' && f >= 0 && f <= 1);
       const kind = o.properties?.find((p) => p.name === 'kind')?.value;
-      if (kind !== undefined) expect(['grass', 'reeds'], `grass area ${o.id} kind`).toContain(kind);
+      if (kind !== undefined) expect(['grass', 'reeds', 'autumn'], `grass area ${o.id} kind`).toContain(kind);
     }
   });
 

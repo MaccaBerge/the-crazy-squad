@@ -108,4 +108,8 @@ test('areas mix in flowers, and reed areas are mostly reeds', () => {
   const reeds = kinds(scatter(area, 2000, 1, undefined, { reeds: true }));
   expect(reeds.filter((k) => k === 'reed').length).toBeGreaterThan(1300);
   expect(reeds).not.toContain('flower');
+  const autumn = kinds(scatter(area, 2000, 1, undefined, { autumn: true }));
+  expect(autumn.filter((k) => k === 'autumn').length).toBeGreaterThan(1500);
+  expect(autumn).toContain('grass'); // a little green stays
+  expect(kinds(scatter(area, 2000, 1))).not.toContain('autumn');
 });
