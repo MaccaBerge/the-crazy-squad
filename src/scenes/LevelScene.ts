@@ -78,6 +78,8 @@ export class LevelScene extends Phaser.Scene {
       const s = this.physics.add.sprite(spawn.x, spawn.y, characterTexture(def)).setOrigin(0.5, 1) as CharSprite;
       s.body.setSize(def.body.w, def.body.h, false).setOffset((FRAME - def.body.w) / 2, FRAME - def.body.h);
       s.setCollideWorldBounds(true);
+      // Phaser only snaps unflipped sprites to whole pixels; mirrored (left-facing) ones landed between pixels and sampled wrong columns.
+      s.setVertexRoundMode('full');
       offStage(s);
       return s;
     });
