@@ -27,7 +27,7 @@ interface Parts {
 export interface LeafSpot { x: number; y: number; color: number }
 
 /** Where a tree drops leaves from: its canopy's spots in world px, the ground under it, and how many per second. */
-export interface LeafSource { left: number; top: number; baseY: number; spots: LeafSpot[]; shed: number }
+export interface LeafSource { left: number; top: number; baseY: number; spots: LeafSpot[]; shed: number; litter: number }
 
 function cutParts(img: HTMLImageElement, type: TreeType): Parts {
   const canvas = (w: number, h: number) => Object.assign(document.createElement('canvas'), { width: w, height: h });
@@ -75,7 +75,7 @@ export class Trees {
   constructor(scene: Phaser.Scene, objects: MapObject[]) {
     for (const o of objects) {
       if (!isTreeName(o.type)) continue; // the map test rejects unknown types
-      const t = TREE_TYPES[o.type];
+      const t: TreeType = TREE_TYPES[o.type];
       const x = Math.round(o.x ?? 0), y = Math.round(o.y ?? 0);
       const img = scene.textures.get(`tree:${o.type}`).getSourceImage() as HTMLImageElement;
       if (!this.parts.has(o.type)) this.parts.set(o.type, cutParts(img, t));
@@ -89,6 +89,7 @@ export class Trees {
       this.sources.push({
         left: x - t.base.x, top: y - t.base.y, baseY: y, spots: parts.spots,
         shed: typeof shed === 'number' ? shed : t.shed,
+        litter: t.litter ?? 0,
       });
       this.bodies.push(scene.physics.add.staticBody(x - t.block.w / 2, y - t.block.h, t.block.w, t.block.h));
       this.trees.push({ sprite, tex, parts, type: t, offsets: new Int8Array(parts.clumps.length * 2).fill(99), flex: 0.8 + ((o.id * 7919) % 100) / 250 }); // trees differ a little in stiffness
