@@ -1,6 +1,7 @@
 // Checks every map in public/assets/maps against the rules in docs/world-blueprint.md,
 // so a map Phaser can't load (or that breaks our conventions) fails CI instead of the game.
 import { describe, expect, test } from 'vitest';
+import { isHangingKind } from '../nature/hangingShapes';
 import { isTreeName } from '../nature/treeTypes';
 import { isWeather } from '../nature/weather';
 import { ENTITY_TYPES, MAP_LAYERS, TILE, TILESETS } from './constants';
@@ -79,6 +80,14 @@ describe.each(Object.entries(files))('%s', (_path, raw) => {
       expect(isTreeName(o.type), `tree ${o.id} has unknown type "${o.type}"; see TREE_TYPES in src/nature/treeTypes.ts`).toBe(true);
       const shed = o.properties?.find((p) => p.name === 'shed')?.value;
       if (shed !== undefined) expect(shed, `tree ${o.id} shed (leaves per second)`).toSatisfy((r) => typeof r === 'number' && r >= 0 && r <= 10);
+    }
+  });
+
+  test('hanging things are signs and flags (points) or washing lines (rectangles)', () => {
+    for (const o of map.layers.find((l) => l.name === 'Hanging')?.objects ?? []) {
+      expect(isHangingKind(o.type), `hanging thing ${o.id} has unknown type "${o.type}"; use sign, flag or line`).toBe(true);
+      if (o.type === 'line') expect(o.width, `washing line ${o.id} width (px between posts)`).toSatisfy((w) => w >= 24 && w <= 200);
+      else expect(o.point, `${o.type} ${o.id} must be a point (where its post meets the ground)`).toBe(true);
     }
   });
 });
