@@ -18,7 +18,7 @@
  "tileheight": 16,
  "compressionlevel": -1,
  "nextlayerid": 9,
- "nextobjectid": 33,
+ "nextobjectid": 66,
  "layers": [
   {
    "id": 1,
@@ -11375,12 +11375,41 @@
      ]
     },
     {
-     "id": 31,
-     "name": "ready-made walk",
+     "id": 33,
+     "name": "heavy-gunner idle south",
      "type": "Dog",
      "point": true,
-     "x": 520,
-     "y": 460,
+     "x": 410,
+     "y": 48,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "heavy-gunner"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "idle"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "south"
+      }
+     ]
+    },
+    {
+     "id": 34,
+     "name": "heavy-gunner walk east",
+     "type": "Dog",
+     "point": true,
+     "x": 410,
+     "y": 80,
      "width": 0,
      "height": 0,
      "rotation": 0,
@@ -11404,12 +11433,12 @@
      ]
     },
     {
-     "id": 32,
-     "name": "custom walk",
+     "id": 35,
+     "name": "heavy-gunner walk south",
      "type": "Dog",
      "point": true,
-     "x": 560,
-     "y": 460,
+     "x": 410,
+     "y": 112,
      "width": 0,
      "height": 0,
      "rotation": 0,
@@ -11423,7 +11452,877 @@
       {
        "name": "anim",
        "type": "string",
-       "value": "walk-v3"
+       "value": "walk"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "south"
+      }
+     ]
+    },
+    {
+     "id": 36,
+     "name": "heavy-gunner walk north",
+     "type": "Dog",
+     "point": true,
+     "x": 410,
+     "y": 144,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "heavy-gunner"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "walk"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "north"
+      }
+     ]
+    },
+    {
+     "id": 37,
+     "name": "heavy-gunner death east",
+     "type": "Dog",
+     "point": true,
+     "x": 410,
+     "y": 240,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "heavy-gunner"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "death"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "east"
+      }
+     ]
+    },
+    {
+     "id": 38,
+     "name": "k9-cop idle south",
+     "type": "Dog",
+     "point": true,
+     "x": 438,
+     "y": 48,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "k9-cop"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "idle"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "south"
+      }
+     ]
+    },
+    {
+     "id": 39,
+     "name": "k9-cop walk east",
+     "type": "Dog",
+     "point": true,
+     "x": 438,
+     "y": 80,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "k9-cop"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "walk"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "east"
+      }
+     ]
+    },
+    {
+     "id": 40,
+     "name": "k9-cop walk south",
+     "type": "Dog",
+     "point": true,
+     "x": 438,
+     "y": 112,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "k9-cop"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "walk"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "south"
+      }
+     ]
+    },
+    {
+     "id": 41,
+     "name": "k9-cop walk north",
+     "type": "Dog",
+     "point": true,
+     "x": 438,
+     "y": 144,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "k9-cop"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "walk"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "north"
+      }
+     ]
+    },
+    {
+     "id": 42,
+     "name": "k9-cop run east",
+     "type": "Dog",
+     "point": true,
+     "x": 438,
+     "y": 176,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "k9-cop"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "run"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "east"
+      }
+     ]
+    },
+    {
+     "id": 43,
+     "name": "k9-cop run south",
+     "type": "Dog",
+     "point": true,
+     "x": 438,
+     "y": 208,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "k9-cop"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "run"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "south"
+      }
+     ]
+    },
+    {
+     "id": 44,
+     "name": "k9-cop death east",
+     "type": "Dog",
+     "point": true,
+     "x": 438,
+     "y": 240,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "k9-cop"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "death"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "east"
+      }
+     ]
+    },
+    {
+     "id": 45,
+     "name": "long-shot idle south",
+     "type": "Dog",
+     "point": true,
+     "x": 466,
+     "y": 48,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "long-shot"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "idle"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "south"
+      }
+     ]
+    },
+    {
+     "id": 46,
+     "name": "long-shot walk east",
+     "type": "Dog",
+     "point": true,
+     "x": 466,
+     "y": 80,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "long-shot"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "walk"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "east"
+      }
+     ]
+    },
+    {
+     "id": 47,
+     "name": "long-shot walk south",
+     "type": "Dog",
+     "point": true,
+     "x": 466,
+     "y": 112,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "long-shot"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "walk"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "south"
+      }
+     ]
+    },
+    {
+     "id": 48,
+     "name": "long-shot walk north",
+     "type": "Dog",
+     "point": true,
+     "x": 466,
+     "y": 144,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "long-shot"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "walk"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "north"
+      }
+     ]
+    },
+    {
+     "id": 49,
+     "name": "long-shot run east",
+     "type": "Dog",
+     "point": true,
+     "x": 466,
+     "y": 176,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "long-shot"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "run"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "east"
+      }
+     ]
+    },
+    {
+     "id": 50,
+     "name": "long-shot run south",
+     "type": "Dog",
+     "point": true,
+     "x": 466,
+     "y": 208,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "long-shot"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "run"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "south"
+      }
+     ]
+    },
+    {
+     "id": 51,
+     "name": "long-shot death east",
+     "type": "Dog",
+     "point": true,
+     "x": 466,
+     "y": 240,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "long-shot"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "death"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "east"
+      }
+     ]
+    },
+    {
+     "id": 52,
+     "name": "bruiser idle south",
+     "type": "Dog",
+     "point": true,
+     "x": 494,
+     "y": 48,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "bruiser"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "idle"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "south"
+      }
+     ]
+    },
+    {
+     "id": 53,
+     "name": "bruiser walk east",
+     "type": "Dog",
+     "point": true,
+     "x": 494,
+     "y": 80,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "bruiser"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "walk"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "east"
+      }
+     ]
+    },
+    {
+     "id": 54,
+     "name": "bruiser walk south",
+     "type": "Dog",
+     "point": true,
+     "x": 494,
+     "y": 112,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "bruiser"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "walk"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "south"
+      }
+     ]
+    },
+    {
+     "id": 55,
+     "name": "bruiser walk north",
+     "type": "Dog",
+     "point": true,
+     "x": 494,
+     "y": 144,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "bruiser"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "walk"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "north"
+      }
+     ]
+    },
+    {
+     "id": 56,
+     "name": "bruiser run east",
+     "type": "Dog",
+     "point": true,
+     "x": 494,
+     "y": 176,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "bruiser"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "run"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "east"
+      }
+     ]
+    },
+    {
+     "id": 57,
+     "name": "bruiser run south",
+     "type": "Dog",
+     "point": true,
+     "x": 494,
+     "y": 208,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "bruiser"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "run"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "south"
+      }
+     ]
+    },
+    {
+     "id": 58,
+     "name": "bruiser death east",
+     "type": "Dog",
+     "point": true,
+     "x": 494,
+     "y": 240,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "bruiser"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "death"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "east"
+      }
+     ]
+    },
+    {
+     "id": 59,
+     "name": "mad-bomber idle south",
+     "type": "Dog",
+     "point": true,
+     "x": 522,
+     "y": 48,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "mad-bomber"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "idle"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "south"
+      }
+     ]
+    },
+    {
+     "id": 60,
+     "name": "mad-bomber walk east",
+     "type": "Dog",
+     "point": true,
+     "x": 522,
+     "y": 80,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "mad-bomber"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "walk"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "east"
+      }
+     ]
+    },
+    {
+     "id": 61,
+     "name": "mad-bomber walk south",
+     "type": "Dog",
+     "point": true,
+     "x": 522,
+     "y": 112,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "mad-bomber"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "walk"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "south"
+      }
+     ]
+    },
+    {
+     "id": 62,
+     "name": "mad-bomber walk north",
+     "type": "Dog",
+     "point": true,
+     "x": 522,
+     "y": 144,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "mad-bomber"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "walk"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "north"
+      }
+     ]
+    },
+    {
+     "id": 63,
+     "name": "mad-bomber run east",
+     "type": "Dog",
+     "point": true,
+     "x": 522,
+     "y": 176,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "mad-bomber"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "run"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "east"
+      }
+     ]
+    },
+    {
+     "id": 64,
+     "name": "mad-bomber run south",
+     "type": "Dog",
+     "point": true,
+     "x": 522,
+     "y": 208,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "mad-bomber"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "run"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "south"
+      }
+     ]
+    },
+    {
+     "id": 65,
+     "name": "mad-bomber death east",
+     "type": "Dog",
+     "point": true,
+     "x": 522,
+     "y": 240,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "mad-bomber"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "death"
       },
       {
        "name": "dir",
