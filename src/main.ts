@@ -26,7 +26,7 @@ const game = new Phaser.Game({
 addEventListener('resize', () => game.scale.setGameSize(...viewSize()));
 
 tuningPanel(tuning, {
-  maxSpeed: [20, 300, 5],
+  walkSpeed: [20, 300, 5],
   accel: [100, 6000, 100],
   decel: [100, 6000, 100],
   cameraLerp: [0.02, 1, 0.01],

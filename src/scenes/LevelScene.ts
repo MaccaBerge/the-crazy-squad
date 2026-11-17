@@ -18,10 +18,10 @@ const MAP = 'test';
 const NUDGE_SPEED = 0.6; // corner assist sideways speed, as a share of top speed
 
 /** Live-tunable values (T panel). Character stats multiply the movement values. */
-// maxSpeed is the walk; holding sprint raises it to sprintSpeed while stamina lasts.
+// Walking is the default; holding sprint raises speed to sprintSpeed while stamina lasts.
 // animSpeed: multiplier on walk/run playback, to match feet to ground.
 export const tuning = {
-  ...defaultMove, maxSpeed: 62, sprintSpeed: 115, ...defaultStamina,
+  walkSpeed: 62, sprintSpeed: 115, accel: defaultMove.accel, decel: defaultMove.decel, ...defaultStamina,
   cameraLerp: 0.15, lookahead: 24, swapCooldown: 4, animSpeed: 1,
 };
 
@@ -107,7 +107,7 @@ export class LevelScene extends Phaser.Scene {
   }
 
   private moveParams(def: CharacterDef, sprint = false) {
-    return { maxSpeed: (sprint ? tuning.sprintSpeed : tuning.maxSpeed) * def.stats.speed, accel: tuning.accel * def.stats.accel, decel: tuning.decel * def.stats.accel };
+    return { maxSpeed: (sprint ? tuning.sprintSpeed : tuning.walkSpeed) * def.stats.speed, accel: tuning.accel * def.stats.accel, decel: tuning.decel * def.stats.accel };
   }
 
   private step(dt: number) {
