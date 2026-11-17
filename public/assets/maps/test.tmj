@@ -18,7 +18,7 @@
  "tileheight": 16,
  "compressionlevel": -1,
  "nextlayerid": 9,
- "nextobjectid": 31,
+ "nextobjectid": 33,
  "layers": [
   {
    "id": 1,
@@ -11371,6 +11371,64 @@
        "name": "kind",
        "type": "string",
        "value": "mad-bomber"
+      }
+     ]
+    },
+    {
+     "id": 31,
+     "name": "ready-made walk",
+     "type": "Dog",
+     "point": true,
+     "x": 520,
+     "y": 460,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "heavy-gunner"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "walk"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "east"
+      }
+     ]
+    },
+    {
+     "id": 32,
+     "name": "custom walk",
+     "type": "Dog",
+     "point": true,
+     "x": 560,
+     "y": 460,
+     "width": 0,
+     "height": 0,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "kind",
+       "type": "string",
+       "value": "heavy-gunner"
+      },
+      {
+       "name": "anim",
+       "type": "string",
+       "value": "walk-v3"
+      },
+      {
+       "name": "dir",
+       "type": "string",
+       "value": "east"
       }
      ]
     }

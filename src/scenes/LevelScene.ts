@@ -108,7 +108,7 @@ export class LevelScene extends Phaser.Scene {
     this.dogs = new Dogs(this);
     spawnEntities(map, {
       PlayerSpawn: (o) => (spawn = { x: o.x ?? spawn.x, y: o.y ?? spawn.y }),
-      Dog: (o, p) => (isDogKind(p.kind) ? this.dogs.add(p.kind, o.x ?? 0, o.y ?? 0) : console.warn(`Dog ${o.id}: unknown kind "${p.kind}"`)),
+      Dog: (o, p) => (isDogKind(p.kind) ? this.dogs.add(p.kind, o.x ?? 0, o.y ?? 0, typeof p.anim === 'string' ? { anim: p.anim, dir: String(p.dir ?? 'south') } : undefined) : console.warn(`Dog ${o.id}: unknown kind "${p.kind}"`)),
     });
 
     // All four exist, but only the active one is enabled; the others are off stage (players blueprint §2).
