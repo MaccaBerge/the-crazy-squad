@@ -63,19 +63,27 @@ for (const id of fs.existsSync(plDir) ? fs.readdirSync(plDir) : []) {
   const stills = Object.fromEntries(Object.values(ROWS).map((d) => [d, frameOf(path.join(dir, 'rotations', `${d}.png`))]));
   const own = new Set(Object.values(stills).flatMap((f) => [...f.join('')]).filter((c) => c !== '.').map((c) => palette[c]));
   const stats = { snapped: 0 };
-  const walkOf = (d) => {
-    const wd = path.join(dir, 'animations/walk', d);
-    return fs.existsSync(wd) ? fs.readdirSync(wd).filter((f) => f.endsWith('.png')).sort().map((f) => frameOf(path.join(wd, f), own, stats)) : [];
+  const animOf = (name, d) => {
+    const ad = path.join(dir, 'animations', name, d);
+    return fs.existsSync(ad) ? fs.readdirSync(ad).filter((f) => f.endsWith('.png')).sort().map((f) => frameOf(path.join(ad, f), own, stats)) : [];
   };
-  const rows = Object.entries(ROWS).map(([row, d]) => ({ row, still: stills[d], walk: walkOf(d) }));
+  // Columns per row: the still, then each animation's frames in its own block. Missing animations are left out of anims.json.
+  const ANIMS = { walk: 10, run: 16 }; // base frame rates at full speed; the game scales them with velocity
+  const rows = Object.entries(ROWS).map(([row, d]) => ({ row, still: stills[d], ...Object.fromEntries(Object.keys(ANIMS).map((a) => [a, animOf(a, d)])) }));
   if (stats.snapped) console.log(`  ${id}: snapped ${stats.snapped} animation pixels onto its own colors`);
-  const columns = 1 + Math.max(...rows.map((r) => r.walk.length));
+  const width = Object.fromEntries(Object.keys(ANIMS).map((a) => [a, Math.max(...rows.map((r) => r[a].length))]));
+  const columns = 1 + Object.values(width).reduce((s, n) => s + n, 0);
   const blank = rows[0].still.map((r) => '.'.repeat(r.length));
   const frames = [], anims = {};
-  rows.forEach(({ row, still, walk }, r) => {
-    frames.push(still, ...walk, ...Array(columns - 1 - walk.length).fill(blank));
-    anims[`idle-${row}`] = { frames: [r * columns], frameRate: 1 };
-    anims[`walk-${row}`] = walk.length ? { frames: walk.map((_, i) => r * columns + 1 + i), frameRate: 10 } : anims[`idle-${row}`];
+  rows.forEach((r, i) => {
+    frames.push(r.still);
+    anims[`idle-${r.row}`] = { frames: [i * columns], frameRate: 1 };
+    for (const [a, rate] of Object.entries(ANIMS)) {
+      const start = frames.length;
+      frames.push(...r[a], ...Array(width[a] - r[a].length).fill(blank));
+      if (r[a].length) anims[`${a}-${r.row}`] = { frames: r[a].map((_, k) => start + k), frameRate: rate };
+    }
+    anims[`walk-${r.row}`] ??= anims[`idle-${r.row}`]; // the game always has a walk to play
   });
   write(id, { frames, palette, anims, size: blank.length, columns });
 }
