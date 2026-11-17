@@ -54,13 +54,6 @@ function closest(rgb, set) {
   return [...set].reduce((best, c) => (d(rgb, c) < d(rgb, best) ? c : best));
 }
 
-/** An idle frame slid sideways (up to 2 px) to line up with the still, so standing characters don't jitter left and right. */
-function alignTo(still, frame) {
-  const shift = (f, s) => f.map((r) => (s > 0 ? '.'.repeat(s) + r.slice(0, -s) : s < 0 ? r.slice(-s) + '.'.repeat(-s) : r));
-  const miss = (f) => f.reduce((n, r, y) => n + [...r].filter((c, x) => (c === '.') !== (still[y][x] === '.')).length, 0);
-  return [0, -1, 1, -2, 2].map((s) => shift(frame, s)).reduce((a, b) => (miss(b) < miss(a) ? b : a));
-}
-
 const plDir = path.join(import.meta.dirname, 'pixellab');
 for (const id of fs.existsSync(plDir) ? fs.readdirSync(plDir) : []) {
   const dir = path.join(plDir, id);
@@ -78,7 +71,6 @@ for (const id of fs.existsSync(plDir) ? fs.readdirSync(plDir) : []) {
   // without an idle animation, idle is the still.
   const ANIMS = { idle: 4, walk: 10, run: 16 }; // frame rates; walk and run are at full speed, the game scales them with velocity
   const rows = Object.entries(ROWS).map(([row, d]) => ({ row, still: stills[d], ...Object.fromEntries(Object.keys(ANIMS).map((a) => [a, animOf(a, d)])) }));
-  for (const r of rows) r.idle = r.idle.map((f) => alignTo(r.still, f));
   if (stats.snapped) console.log(`  ${id}: snapped ${stats.snapped} animation pixels onto its own colors`);
   const width = Object.fromEntries(Object.keys(ANIMS).map((a) => [a, Math.max(...rows.map((r) => r[a].length))]));
   const columns = 1 + Object.values(width).reduce((s, n) => s + n, 0);
