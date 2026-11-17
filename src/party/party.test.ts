@@ -41,3 +41,24 @@ test('each member keeps their own stamina, and off-stage members refill', () => 
   for (let i = 0; i < 300; i++) p.tick(0.01, false);
   expect(p.stamina[0].value).toBeGreaterThan(tired);
 });
+
+test('a downed member can not be swapped to, and E/Q skip them', () => {
+  const p = new Party(SQUAD, { swapCooldown: 0, ...defaultStamina });
+  p.health[1].take(999, 0);
+  expect(p.trySwap(1, fits)).toBe('downed');
+  expect(p.targetFor('swapNext')).toBe(2);
+  expect(p.targetFor('swapPrev')).toBe(3);
+});
+
+test('going down forces a swap to the next one standing, ignoring the cooldown, until nobody is left', () => {
+  const p = new Party(SQUAD, { swapCooldown: 4, swapSafe: 0.3, ...defaultStamina });
+  expect(p.trySwap(1, fits)).toBe('ok');
+  expect(p.health[1].take(999, 0)).toBe(0); // still in the swap safety window
+  p.health[1].hp = 0;
+  expect(p.forceSwap()).toBe(true);
+  expect(p.active.id).toBe('christian');
+  expect(p.cooldownLeft).toBe(4);
+  expect(p.health[2].invulnerable).toBe(true); // the safety window
+  for (const i of [0, 2, 3]) p.health[i].hp = 0;
+  expect(p.forceSwap()).toBe(false);
+});
