@@ -1,4 +1,6 @@
 import * as Phaser from 'phaser';
+import { type MapObject, props } from '../world/spawner';
+import { TILE } from '../world/constants';
 import type { Force } from './forces';
 import type { WindParams } from './weather';
 import { wind } from './wind';
@@ -10,6 +12,9 @@ const TEXTURE = 'grass-blades';
 const CELL = { w: 8, h: 16 };
 export const MAX_POSE = 3; // poses are -3..3: three steps of lean each way
 const CHUNK = 16; // px; wind is sampled once per chunk
+// px; blades are drawn in horizontal strips, each at the depth of its top row, so characters sort between them
+// (a blade up to STRIP-1 px below the feet can still draw behind them).
+const STRIP = 4;
 const VIEW_MARGIN = 8; // px; blades just outside the view still update, so leaning ones don't pop at the edge
 
 /** Placeholder blade types: height and ramp tones from root to tip. Real blade art replaces these in step 5. */
@@ -66,7 +71,12 @@ export function seeded(seed: number) {
 }
 
 /** `count` blades scattered evenly at random over a rectangle, sorted back to front. */
-export function scatter(area: { x: number; y: number; w: number; h: number }, count: number, seed: number): Blade[] {
+export function scatter(
+  area: { x: number; y: number; w: number; h: number },
+  count: number,
+  seed: number,
+  inside: (x: number, y: number) => boolean = () => true,
+): Blade[] {
   const rnd = seeded(seed);
   const blades = Array.from({ length: count }, () => ({
     x: Math.floor(area.x + rnd() * area.w),
@@ -75,7 +85,38 @@ export function scatter(area: { x: number; y: number; w: number; h: number }, co
     lean: (rnd() - 0.5) * 1.2,
     flex: 0.7 + rnd() * 0.5,
   }));
-  return blades.sort((a, b) => a.y - b.y);
+  return blades.filter((b) => inside(b.x, b.y)).sort((a, b) => a.y - b.y);
+}
+
+const DEFAULT_DENSITY = 6; // blades per tile
+
+/** Even-odd rule: whether (x, y) is inside the polygon. */
+function insidePolygon(pts: { x: number; y: number }[], x: number, y: number) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const a = pts[i], b = pts[j];
+    if (a.y > y !== b.y > y && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * Blades for every area on a map's `Grass` object layer (rectangles or polygons), sorted back to front.
+ * Optional properties: `density` (blades per tile) and `seed` (defaults to the object's id, so each area differs).
+ */
+export function bladesFromMap(areas: MapObject[]): Blade[] {
+  return areas
+    .flatMap((o) => {
+      const { density = DEFAULT_DENSITY, seed = o.id } = props(o) as { density?: number; seed?: number };
+      const x = o.x ?? 0, y = o.y ?? 0;
+      const poly = o.polygon?.map((p) => ({ x: x + p.x, y: y + p.y }));
+      const xs = poly?.map((p) => p.x) ?? [x, x + (o.width ?? 0)];
+      const ys = poly?.map((p) => p.y) ?? [y, y + (o.height ?? 0)];
+      const box = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+      const count = Math.round(((box.w * box.h) / TILE ** 2) * density);
+      return scatter(box, count, seed, poly && ((px, py) => insidePolygon(poly, px + 0.5, py + 0.5)));
+    })
+    .sort((a, b) => a.y - b.y);
 }
 
 /** Draws every blade type in every pose onto one canvas texture: a row per type, a column per pose. */
@@ -102,7 +143,9 @@ function makeTexture(scene: Phaser.Scene) {
 }
 
 export class Grass {
-  readonly layer: Phaser.GameObjects.SpriteGPULayer;
+  private layers: Phaser.GameObjects.SpriteGPULayer[] = []; // one per strip that has blades
+  private layerOf: Uint16Array; // per blade: its strip's layer
+  private member: Uint32Array; // per blade: its index in that layer
   private pose: Int8Array;
   private frames: number[][]; // frame index per type and pose (+MAX_POSE)
   private chunks = new Map<number, number[]>(); // chunk key -> member indices
@@ -116,10 +159,26 @@ export class Grass {
   private target: Float32Array;
   private active = new Set<number>();
 
+  /** `blades` must be sorted back to front (`scatter` does that). Strip depths are `depth` + their top y, like actors' feet. */
   constructor(scene: Phaser.Scene, private blades: Blade[], worldWidth: number, depth: number) {
     makeTexture(scene);
-    this.layer = scene.add.spriteGPULayer(TEXTURE, blades.length).setDepth(depth);
-    const idx = this.layer.frameDataIndices as Record<string, number>;
+    this.layerOf = new Uint16Array(blades.length);
+    this.member = new Uint32Array(blades.length);
+    for (let start = 0; start < blades.length; ) {
+      const strip = Math.floor(blades[start].y / STRIP);
+      let end = start;
+      while (end < blades.length && Math.floor(blades[end].y / STRIP) === strip) end++;
+      const layer = scene.add.spriteGPULayer(TEXTURE, end - start).setDepth(depth + strip * STRIP);
+      for (let i = start; i < end; i++) {
+        const b = blades[i];
+        layer.addMember({ x: b.x + 0.5, y: b.y + 1, originX: 0.5, originY: 1, frame: `${b.type}:0` });
+        this.layerOf[i] = this.layers.length;
+        this.member[i] = i - start;
+      }
+      this.layers.push(layer);
+      start = end;
+    }
+    const idx = (this.layers[0]?.frameDataIndices ?? {}) as Record<string, number>;
     this.frames = TYPES.map((_, type) => Array.from({ length: MAX_POSE * 2 + 1 }, (_, i) => idx[`${type}:${i - MAX_POSE}`]));
     this.pose = new Int8Array(blades.length);
     this.push = new Float32Array(blades.length);
@@ -127,7 +186,6 @@ export class Grass {
     this.target = new Float32Array(blades.length);
     this.cols = Math.ceil(worldWidth / CHUNK);
     blades.forEach((b, i) => {
-      this.layer.addMember({ x: b.x + 0.5, y: b.y + 1, originX: 0.5, originY: 1, frame: `${b.type}:0` });
       const key = Math.floor(b.y / CHUNK) * this.cols + Math.floor(b.x / CHUNK);
       (this.chunks.get(key) ?? this.chunks.set(key, []).get(key)!).push(i);
     });
@@ -177,7 +235,7 @@ export class Grass {
           if (pose === this.pose[i]) continue;
           this.pose[i] = pose;
           this.f32[24] = this.frames[b.type][pose + MAX_POSE];
-          this.layer.patchMember(i, this.patch, this.mask);
+          this.layers[this.layerOf[i]].patchMember(this.member[i], this.patch, this.mask);
           changed++;
         }
       }
