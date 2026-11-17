@@ -185,7 +185,7 @@ A field can hold **tens of thousands of blades**, so:
 
 All of these use the same `windAt()`:
 
-- **Bushes:** small PixelLab images on the `Trees` layer (round, berry, flowering, and their autumn versions), swaying like a small tree. They block movement like a trunk.
+- **Bushes:** small PixelLab images on the `Trees` layer (round, berry, flowering, and their autumn versions), swaying like a small tree. They have no hitbox, so characters walk through them.
 - **Flowers:** a grass blade type (a stalk with a flower on top in berry, violet or autumn), scattered in grass areas and pushed like grass.
 - **Reeds:** a tall grass blade type for the water's edge, ready for the water blueprint.
 - **Hanging things:** signs, flags and washing lines, drawn by code on the palette (`src/nature/hangingShapes.ts`) and placed on a **`Hanging` object layer** in Tiled. The map test checks their types and shapes.
