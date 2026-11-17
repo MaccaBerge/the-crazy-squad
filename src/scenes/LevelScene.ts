@@ -10,7 +10,9 @@ import { cornerNudge, rectFree, type SolidAt } from '../collision/cornerAssist';
 import { LocalController } from '../input/localController';
 import { defaultMove, stepVelocity } from '../movement';
 import { Party, SWAP_ACTIONS, type SwapAction } from '../party/party';
-import { DEPTH } from '../world/constants';
+import { DEFAULT_WEATHER, isWeather, WEATHER } from '../nature/weather';
+import { gust, wind } from '../nature/wind';
+import { DEPTH, TILE } from '../world/constants';
 import { loadMap, preloadMap } from '../world/loadMap';
 import { spawnEntities } from '../world/spawner';
 
@@ -23,6 +25,7 @@ const NUDGE_SPEED = 0.6; // corner assist sideways speed, as a share of top spee
 export const tuning = {
   walkSpeed: 62, sprintSpeed: 115, accel: defaultMove.accel, decel: defaultMove.decel, ...defaultStamina,
   cameraLerp: 0.15, lookahead: 24, swapCooldown: 4, animSpeed: 1,
+  ...WEATHER[DEFAULT_WEATHER], // replaced by the map's weather on load
 };
 
 type CharSprite = Phaser.Physics.Arcade.Sprite & { body: Phaser.Physics.Arcade.Body };
@@ -50,6 +53,7 @@ export class LevelScene extends Phaser.Scene {
   private sweat: { x: number; y: number; vx: number; vy: number; age: number }[] = [];
   private nextSweat = 0;
   private facingDot!: Phaser.GameObjects.Image;
+  private windView!: Phaser.GameObjects.Graphics;
 
   constructor() {
     super('level');
@@ -66,6 +70,8 @@ export class LevelScene extends Phaser.Scene {
 
   create() {
     const { map, colliders } = loadMap(this, MAP);
+    const weather = (map.properties as { name: string; value: unknown }[]).find((p) => p.name === 'weather')?.value;
+    Object.assign(tuning, WEATHER[isWeather(weather) ? weather : DEFAULT_WEATHER]);
     this.solid = (tx, ty) => colliders.some((l) => l.getTileAt(tx, ty)?.collides);
     makePlaceholderTextures(this, SQUAD);
     createAnims(this, SQUAD);
@@ -102,6 +108,10 @@ export class LevelScene extends Phaser.Scene {
       if (world.drawDebug && !world.debugGraphic) world.createDebugGraphic();
       if (!world.drawDebug) world.debugGraphic?.clear();
     });
+
+    // Dev: V shows the wind as arrows, one per tile (nature blueprint §8, step 1).
+    this.windView = this.add.graphics().setDepth(DEPTH.effects).setVisible(false);
+    this.input.keyboard!.on('keydown-V', () => this.windView.setVisible(!this.windView.visible));
 
     this.scene.launch('hud', { party: this.party });
   }
@@ -185,6 +195,23 @@ export class LevelScene extends Phaser.Scene {
     }
     this.rig.update(s.body.velocity, this.moveParams(this.party.active, this.sprinting).maxSpeed, delta / 1000);
     this.drawStamina(s, delta / 1000);
+    if (this.windView.visible) this.drawWind();
+  }
+
+  /** One arrow per tile in view: length is the wind's strength, orange where a gust is passing. */
+  private drawWind() {
+    const g = this.windView.clear();
+    const view = this.cameras.main.worldView;
+    const t = this.time.now / 1000;
+    const d = (tuning.windDir * Math.PI) / 180;
+    const [dx, dy] = [Math.cos(d), Math.sin(d)];
+    for (let y = Math.floor(view.y / TILE) * TILE + TILE / 2; y < view.bottom; y += TILE)
+      for (let x = Math.floor(view.x / TILE) * TILE + TILE / 2; x < view.right; x += TILE) {
+        const w = wind(x, y, t, tuning);
+        const len = w * 12;
+        g.lineStyle(1, gust(x, y, t, tuning) > 0.3 ? 0xf2a846 : 0x8edcf2).lineBetween(x, y, x + dx * len, y + dy * len);
+        g.fillStyle(0x241520).fillRect(x - 0.5, y - 0.5, 1, 1);
+      }
   }
 
   /** A thin bar under the active character's feet, hidden while full. Red while winded, flashing while exhausted. */

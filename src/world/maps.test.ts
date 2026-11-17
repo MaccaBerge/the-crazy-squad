@@ -1,10 +1,11 @@
 // Checks every map in public/assets/maps against the rules in docs/world-blueprint.md,
 // so a map Phaser can't load (or that breaks our conventions) fails CI instead of the game.
 import { describe, expect, test } from 'vitest';
+import { isWeather } from '../nature/weather';
 import { ENTITY_TYPES, MAP_LAYERS, TILE, TILESETS } from './constants';
 
 type TiledLayer = { name: string; type: string; width?: number; height?: number; data?: unknown; encoding?: string; layers?: TiledLayer[]; objects?: { id: number; type?: string; template?: string }[] };
-type TiledMap = { orientation: string; infinite: boolean; width: number; height: number; tilewidth: number; tileheight: number; layers: TiledLayer[]; tilesets: Record<string, unknown>[] };
+type TiledMap = { orientation: string; infinite: boolean; width: number; height: number; tilewidth: number; tileheight: number; layers: TiledLayer[]; tilesets: Record<string, unknown>[]; properties?: { name: string; value: unknown }[] };
 
 const files = import.meta.glob('/public/assets/maps/*.tmj', { eager: true, query: '?raw', import: 'default' }) as Record<string, string>;
 
@@ -51,5 +52,10 @@ describe.each(Object.entries(files))('%s', (_path, raw) => {
     const objects = map.layers.find((l) => l.name === 'Entities')?.objects ?? [];
     for (const o of objects) expect(ENTITY_TYPES, `object ${o.id} has unknown class "${o.type}"`).toContain(o.type);
     expect(objects.filter((o) => o.type === 'PlayerSpawn').length, 'PlayerSpawn objects').toBe(1);
+  });
+
+  test('has a known weather preset', () => {
+    const weather = map.properties?.find((p) => p.name === 'weather')?.value;
+    expect(isWeather(weather), `map property "weather" is "${weather}"; use one of WEATHER in src/nature/weather.ts`).toBe(true);
   });
 });
