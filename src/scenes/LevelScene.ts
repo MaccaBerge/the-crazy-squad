@@ -26,12 +26,14 @@ import { Dogs, isDogKind, preloadDogs } from '../dogs/dogs';
 import { BREEDS } from '../dogs/breeds';
 import { DogAI } from '../dogs/dogAI';
 import type { Vec } from '../movement';
+import { inArc, type Swing, swingPhase } from '../combat/swing';
 
 const MAP = new URLSearchParams(location.search).get('map') ?? 'test'; // dev: ?map=backyard
 // Dev: ?grass=20000 covers the map in that many blades, with an fps readout (nature blueprint §8, step 2).
 const STRESS_BLADES = Number(new URLSearchParams(location.search).get('grass')) || 0;
 const NUDGE_SPEED = 0.6; // corner assist sideways speed, as a share of top speed
 const HURT = 0.18; // seconds a hit pushes you around before your input counts again
+const ATTACK_SLOW = 0.4; // share of walking speed while swinging: you can creep, not run (combat blueprint §3)
 
 /** Live-tunable values (T panel). Character stats multiply the movement values. */
 // Walking is the default; holding sprint raises speed to sprintSpeed while stamina lasts.
@@ -40,6 +42,7 @@ export const tuning = {
   walkSpeed: 62, sprintSpeed: 115, accel: defaultMove.accel, decel: defaultMove.decel, ...defaultStamina,
   cameraLerp: 0.15, lookahead: 24, swapCooldown: 4, animSpeed: 1,
   iframes: 0.8, swapSafe: 0.3, // s: can't be hit again after a hit / right after swapping in
+  hitstop: 50, heavyHitstop: 80, // ms the world freezes when a hit lands (combat blueprint §5)
   ...WEATHER[DEFAULT_WEATHER], // replaced by the map's weather on load
 };
 
@@ -77,6 +80,9 @@ export class LevelScene extends Phaser.Scene {
   private dogs!: Dogs;
   private brains: DogAI[] = [];
   private hurt = 0;
+  private swing?: { def: Swing; t: number; hit: Set<DogAI> };
+  private swingFx!: Phaser.GameObjects.Graphics;
+  private frozenUntil = 0;
   private knock: Vec = { x: 0, y: 0 };
   private readout?: HTMLDivElement;
 
@@ -100,6 +106,8 @@ export class LevelScene extends Phaser.Scene {
     this.party = new Party(SQUAD, tuning);
     this.brains = [];
     this.hurt = 0;
+    this.swing = undefined;
+    this.frozenUntil = 0;
     const { map, colliders } = loadMap(this, MAP);
     const weather = (map.properties as { name: string; value: unknown }[]).find((p) => p.name === 'weather')?.value;
     Object.assign(tuning, WEATHER[isWeather(weather) ? weather : DEFAULT_WEATHER]);
@@ -151,6 +159,7 @@ export class LevelScene extends Phaser.Scene {
     this.look = new WeatherLook(this, tuning.light);
     this.facingDot = this.add.image(0, 0, 'dot');
     this.staminaBar = this.add.graphics().setDepth(DEPTH.effects);
+    this.swingFx = this.add.graphics().setDepth(DEPTH.effects);
 
     this.rig = new CameraRig(this.cameras.main, tuning);
     this.rig.follow(this.active);
@@ -189,13 +198,15 @@ export class LevelScene extends Phaser.Scene {
     const s = this.active;
     for (const d of this.brains) d.step(dt, s, tuning, (push, damage) => this.hit(push, damage));
     if (!this.active.active) return; // squad wiped, restarting
+    this.attack(intent.pressed.has('attack'), dt);
     if (this.hurt > 0) {
       // Knocked back: the push fades out and your input waits, so the hit reads.
       this.hurt = Math.max(0, this.hurt - dt);
       s.body.setVelocity(this.knock.x * (this.hurt / HURT), this.knock.y * (this.hurt / HURT));
       return;
     }
-    const p = this.moveParams(this.party.active, this.sprinting);
+    const p = this.moveParams(this.party.active, this.sprinting && !this.swing);
+    if (this.swing) p.maxSpeed *= ATTACK_SLOW;
     // Exhausted (bar just ran dry): walk slower. Animation speed still compares to the normal walk, so the legs look heavy.
     p.maxSpeed *= this.party.stamina[this.party.activeIndex].speedFactor;
     const v = stepVelocity(s.body.velocity, intent.move, dt, p);
@@ -205,11 +216,44 @@ export class LevelScene extends Phaser.Scene {
     if (nudge?.y) v.y = nudge.y * p.maxSpeed * NUDGE_SPEED;
     b.setVelocity(v.x, v.y);
 
+    if (this.swing) return; // facing is locked from windup to the end of recovery, so a swing can't turn mid-arc
     if (intent.move.x || intent.move.y) {
       const len = Math.hypot(intent.move.x, intent.move.y);
       this.facing = { x: intent.move.x / len, y: intent.move.y / len };
     }
     this.dir = snapDir(this.dir, intent.move);
+  }
+
+  /** The active character's basic attack (combat blueprint §3): start it on a press, hit dogs in the arc while it's active. */
+  private attack(pressed: boolean, dt: number) {
+    const def = this.party.active.attack;
+    if (pressed && !this.swing && this.hurt <= 0) {
+      this.controller.consume('attack'); // while swinging the press stays buffered, so mashing chains swings
+      if (def) this.swing = { def, t: 0, hit: new Set() };
+    }
+    const sw = this.swing;
+    if (!sw) return;
+    sw.t += dt;
+    const phase = swingPhase(sw.def, sw.t);
+    if (phase === 'done') return void (this.swing = undefined);
+    if (phase !== 'active') return;
+    const s = this.active, f = this.facing;
+    for (const d of this.brains) {
+      if (d.out || sw.hit.has(d) || !inArc(sw.def, s, f, d.sprite)) continue;
+      sw.hit.add(d);
+      if (d.takeHit(sw.def.damage, { x: f.x * sw.def.knockback, y: f.y * sw.def.knockback })) this.freeze(sw.def.heavy ? tuning.heavyHitstop : tuning.hitstop);
+    }
+  }
+
+  /**
+   * Hit freeze: a few ms where nothing moves, so a hit lands with weight.
+   * shortcut: pauses the whole physics world, not only the two involved; fine while fights are small.
+   */
+  private freeze(ms: number) {
+    const world = this.physics.world;
+    this.frozenUntil = Math.max(this.frozenUntil, this.time.now + ms);
+    world.pause();
+    this.time.delayedCall(ms, () => this.time.now >= this.frozenUntil - 1 && world.resume());
   }
 
   private trySwap(action: SwapAction) {
@@ -238,6 +282,7 @@ export class LevelScene extends Phaser.Scene {
   private swapIn(from: CharSprite) {
     const to = this.active;
     const { x: vx, y: vy } = from.body.velocity;
+    this.swing = undefined; // swapping cancels whatever the old one was doing
     offStage(from);
     onStage(to, from.x, from.y);
     to.body.setVelocity(vx, vy);
@@ -256,6 +301,8 @@ export class LevelScene extends Phaser.Scene {
   private hit(push: Vec, damage: number) {
     const i = this.party.activeIndex, health = this.party.health[i];
     if (!health.take(damage, tuning.iframes)) return; // invincible: no push either
+    this.freeze(tuning.hitstop);
+    this.swing = undefined; // a hit interrupts your attack
     this.hurt = HURT;
     this.knock = push;
     this.flash(this.active, 0xb4443a);
@@ -299,6 +346,7 @@ export class LevelScene extends Phaser.Scene {
     }
     this.rig.update(s.body.velocity, this.moveParams(this.party.active, this.sprinting).maxSpeed, delta / 1000);
     this.drawStamina(s, delta / 1000);
+    this.drawSwing(s);
     if (this.windView.visible) this.drawWind();
     this.trees.update(this.time.now / 1000, delta / 1000, tuning, s);
     this.leaves.update(this.time.now / 1000, Math.min(delta / 1000, 0.05), tuning);
@@ -314,6 +362,17 @@ export class LevelScene extends Phaser.Scene {
       if (this.readout && this.game.getFrame() % 30 === 0)
         this.readout.textContent = `${STRESS_BLADES} blades · ${this.grass.pushed} pushed · ${changed} re-posed in ${ms.toFixed(2)} ms · ${this.game.loop.actualFps.toFixed(0)} fps`;
     }
+  }
+
+  /** Placeholder for the wrench: a pale arc sweeping across the front during the active part, fading in recovery. */
+  private drawSwing(s: CharSprite) {
+    const g = this.swingFx.clear(), sw = this.swing;
+    if (!sw) return;
+    const d = sw.def, into = sw.t - d.windup;
+    if (into < 0) return;
+    const half = ((d.arc / 2) * Math.PI) / 180, a = Math.atan2(this.facing.y, this.facing.x);
+    const sweep = Math.min(1, into / d.active), fade = into <= d.active ? 1 : 1 - (into - d.active) / d.recovery;
+    g.lineStyle(2, 0xe6faf6, 0.9 * fade).beginPath().arc(s.x, s.y - 6, d.radius - 6, a - half, a - half + 2 * half * sweep).strokePath();
   }
 
   /** One arrow per tile in view, pointing where the wind blows there: length is its strength, orange where a gust is passing. */
