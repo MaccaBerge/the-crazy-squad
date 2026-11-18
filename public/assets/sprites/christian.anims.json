@@ -4,83 +4,168 @@
   "anims": {
     "idle-down": {
       "frames": [
-        0,
-        1
+        1,
+        2,
+        3,
+        4
       ],
-      "frameRate": 2.2
+      "frameRate": 4
     },
     "walk-down": {
       "frames": [
-        2,
-        3,
-        4,
-        5
-      ],
-      "frameRate": 10
-    },
-    "idle-down-side": {
-      "frames": [
+        5,
         6,
-        7
-      ],
-      "frameRate": 2.2
-    },
-    "walk-down-side": {
-      "frames": [
+        7,
         8,
         9,
-        10,
-        11
+        10
       ],
       "frameRate": 10
     },
-    "idle-side": {
+    "run-down": {
       "frames": [
+        11,
         12,
-        13
-      ],
-      "frameRate": 2.2
-    },
-    "walk-side": {
-      "frames": [
+        13,
         14,
         15,
         16,
-        17
+        17,
+        18
       ],
-      "frameRate": 10
+      "frameRate": 16
     },
-    "idle-up-side": {
-      "frames": [
-        18,
-        19
-      ],
-      "frameRate": 2.2
-    },
-    "walk-up-side": {
+    "idle-down-side": {
       "frames": [
         20,
         21,
         22,
         23
       ],
-      "frameRate": 10
+      "frameRate": 4
     },
-    "idle-up": {
+    "walk-down-side": {
       "frames": [
         24,
-        25
-      ],
-      "frameRate": 2.2
-    },
-    "walk-up": {
-      "frames": [
+        25,
         26,
         27,
         28,
         29
       ],
       "frameRate": 10
+    },
+    "run-down-side": {
+      "frames": [
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37
+      ],
+      "frameRate": 16
+    },
+    "idle-side": {
+      "frames": [
+        39,
+        40,
+        41,
+        42
+      ],
+      "frameRate": 4
+    },
+    "walk-side": {
+      "frames": [
+        43,
+        44,
+        45,
+        46,
+        47,
+        48
+      ],
+      "frameRate": 10
+    },
+    "run-side": {
+      "frames": [
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56
+      ],
+      "frameRate": 16
+    },
+    "idle-up-side": {
+      "frames": [
+        58,
+        59,
+        60,
+        61
+      ],
+      "frameRate": 4
+    },
+    "walk-up-side": {
+      "frames": [
+        62,
+        63,
+        64,
+        65,
+        66,
+        67
+      ],
+      "frameRate": 10
+    },
+    "run-up-side": {
+      "frames": [
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75
+      ],
+      "frameRate": 16
+    },
+    "idle-up": {
+      "frames": [
+        77,
+        78,
+        79,
+        80
+      ],
+      "frameRate": 4
+    },
+    "walk-up": {
+      "frames": [
+        81,
+        82,
+        83,
+        84,
+        85,
+        86
+      ],
+      "frameRate": 10
+    },
+    "run-up": {
+      "frames": [
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94
+      ],
+      "frameRate": 16
     }
   }
 }
