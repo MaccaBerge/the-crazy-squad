@@ -6,7 +6,7 @@ How fighting works in The Crazy Squad: what each friend does in a fight, how dod
 - the [players, input and camera blueprint](players-input-camera-blueprint.md): intents, buffered presses, swapping, downed members
 - the collision blueprint: hitboxes, hurtboxes and the damage pipeline
 
-Every number here is a **starting value for the tuning panel**, not a final one.
+Every number here is a **starting value for the tuning panel**, not a final one. The mechanics themselves are provisional too: they get tested in play and may change.
 
 ---
 
@@ -17,7 +17,7 @@ Agreed on 2026-11-18:
 | Question | Decision |
 |---|---|
 | Overall style | **Mixed by character.** Each friend fights differently (melee, ranged, control), so the situation decides who you want on the field. |
-| Aiming | **Facing direction.** Attacks go where you're facing, snapped to 8 directions. Keyboard only, identical on a controller, simple to send online later. |
+| Aiming | **Facing direction.** Attacks go where you're facing, snapped to 8 directions. Keyboard only, identical on a controller, simple to send online later. **Provisional:** to be tested in play before it is final; mouse / right-stick aim is the alternative. |
 | Beaten dogs | **Knocked out, cartoony.** Yelp, stars over the head, then they run off or poof away. No blood, no bodies. |
 | Fight size | **Small, tactical groups.** 2–5 dogs at a time, each breed with its own trick. You swap to counter them. |
 | Roles | Kristian bruiser, Jonas ranged, Christian fast fighter, Marcus control (section 3). |
@@ -40,7 +40,7 @@ Agreed on 2026-11-18:
 | | Kristian | Jonas | Christian | Marcus |
 |---|---|---|---|---|
 | **Role** | Bruiser | Ranged | Fast fighter | Control |
-| **Basic attack** | **Wrench swing**: a wide arc in front, slow, heavy knockback | **Bandy shot**: hits the orange ball in the facing direction | **Punch / punch / kick**: a fast 3-hit combo, the kick knocks back | **Phone zap**: a short-range beam that stuns a dog for a moment |
+| **Basic attack** | **Wrench swing**: a wide arc in front, slow, heavy knockback | **Bandy shot**: hits the white ball in the facing direction | **Punch / punch / kick**: a fast 3-hit combo, the kick knocks back | **Phone zap**: a short-range beam that stuns a dog for a moment |
 | **Ability 1** | Mechanic (to design) | Bandy (to design, e.g. a hard slapshot that pierces) | **Time-slow**: slows enemies, projectiles and hazards, never teammates; about 3–4 s, cooldown about 12–15 s, ends on swap | **Hack** (to design, e.g. take over a turret, open electronic doors) |
 | **Good against** | Tanks, shields (knockback breaks guard) | Snipers and bombers you can't reach | Groups, fast dogs, finishing off | Dangerous single dogs: stun them before their attack lands |
 | **Weak at** | Fast dogs, anything at range | Dogs right on top of him | Tanks (low damage per hit) | Raw damage |

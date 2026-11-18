@@ -56,7 +56,7 @@ Roles and basic attacks were agreed in the [combat blueprint](combat-blueprint.m
 | Real-life skill or trait | | | | |
 | Fantasy ("in the game, this means…") | | | | |
 | Role | Control | Bruiser | Fast fighter | Ranged |
-| Basic attack | Phone zap (short stun) | Wrench swing | Punch, punch, kick | Bandy shot (orange ball) |
+| Basic attack | Phone zap (short stun) | Wrench swing | Punch, punch, kick | Bandy shot (white ball) |
 | Ability 1 (signature) | Hack | Mechanic (to design) | Time-slow | Bandy (to design) |
 | Ability 2 | | | | |
 | Passive | | | | |
