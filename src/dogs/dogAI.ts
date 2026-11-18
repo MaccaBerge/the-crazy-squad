@@ -1,8 +1,9 @@
 import * as Phaser from 'phaser';
 import { type Dir, snapDir } from '../art/facing';
-import { type Brain, newBrain, think } from '../ai/dogBrain';
+import { type Brain, hurt, newBrain, think } from '../ai/dogBrain';
 import { type Cell, cellFeet, clearLine, findPath } from '../ai/path';
 import type { SolidAt } from '../collision/cornerAssist';
+import { Health } from '../collision/hits';
 import { stepVelocity, type Vec } from '../movement';
 import { DEPTH } from '../world/constants';
 import { toTile } from '../world/grid';
@@ -18,6 +19,11 @@ export type DogTuning = { walkSpeed: number; accel: number; decel: number };
 const BODY = { w: 12, h: 6 }; // feet only, like the squad
 const FRAME = 32;
 const REPATH = 0.3; // s between path searches while the way is blocked
+const IFRAMES = 0.1; // s a dog ignores hits after one lands: short, so fast combos connect (combat blueprint §6)
+const KNOCK = 0.15; // s a hit pushes the dog around
+const FLASH = 0.06; // s of white after a hit
+const DIZZY = 0.6; // s of spinning with stars when knocked out, before the poof
+const POOF = 0.25; // s of the poof
 
 /**
  * One thinking dog (dog AI blueprint §11): the brain decides, this turns it into movement, animation and the hit.
@@ -36,6 +42,12 @@ export class DogAI {
   nav?: SolidAt;
   private path: Cell[] = [];
   private repath = 0;
+  readonly health: Health;
+  private knock: Vec = { x: 0, y: 0 };
+  private knockT = 0;
+  private flashT = 0;
+  /** Seconds since being knocked out, or -1 while still in the fight. */
+  private ko = -1;
 
   constructor(private scene: Phaser.Scene, readonly kind: DogKind, private breed: Breed, x: number, y: number) {
     this.sprite = scene.physics.add.sprite(x, y, `dog-${kind}`, 2).setOrigin(0.5, 1) as DogSprite;
@@ -44,11 +56,39 @@ export class DogAI {
     this.marks = scene.add.graphics().setDepth(DEPTH.effects);
     this.label = scene.add.text(x, y, '', { fontFamily: 'monospace', fontSize: '8px', color: '#fff', backgroundColor: '#000a', resolution: 4 })
       .setOrigin(0.5, 1).setDepth(DEPTH.ui).setVisible(false);
+    this.health = new Health(breed.maxHp);
+  }
+
+  /** Out of the fight: no hits, no attacks, no collisions. */
+  get out() {
+    return this.ko >= 0;
+  }
+
+  /**
+   * A squad attack reached this dog (combat blueprint §6). Returns whether it landed.
+   * `push` is the attacker's knockback in px/s; the breed's weight scales it and its poise decides the stagger.
+   */
+  takeHit(damage: number, push: Vec) {
+    if (this.out || !this.health.take(damage, IFRAMES)) return false;
+    const w = this.breed.weight;
+    this.knock = { x: push.x * w, y: push.y * w };
+    this.knockT = KNOCK;
+    this.flashT = FLASH;
+    hurt(this.brain, Math.hypot(push.x, push.y) >= this.breed.poise);
+    if (this.health.down) {
+      // shortcut: knocked-out dogs spin and poof in code; run off screen once there's a KO animation.
+      this.ko = 0;
+      this.sprite.disableBody(false, false);
+    }
+    return true;
   }
 
   /** Fixed physics step: think, then move. `onHit` fires once per attack that reaches the target, with the push and damage. */
   step(dt: number, target: { x: number; y: number } | undefined, t: DogTuning, onHit: (push: Vec, damage: number) => void) {
     const s = this.sprite, b = this.breed;
+    this.health.tick(dt);
+    this.flashT = Math.max(0, this.flashT - dt);
+    if (this.out) return void (this.ko += dt);
     const to = target && { x: target.x - s.x, y: target.y - s.y };
     const dist = to ? Math.hypot(to.x, to.y) : null;
     const entered = think(this.brain, b.brain, dist, dt);
@@ -64,7 +104,8 @@ export class DogAI {
       if (gd > 0.5) move = { x: gx / gd, y: gy / gd };
     } else this.path = [];
     const p = { maxSpeed: t.walkSpeed * b.speed, accel: t.accel * b.accel, decel: t.decel * b.accel };
-    const v = state === 'attack' ? { x: this.aim.x * b.lunge.speed, y: this.aim.y * b.lunge.speed } : stepVelocity(s.body.velocity, move, dt, p);
+    const v = this.knockT > 0 ? (this.knockT = Math.max(0, this.knockT - dt), { x: this.knock.x * (this.knockT / KNOCK), y: this.knock.y * (this.knockT / KNOCK) })
+      : state === 'attack' ? { x: this.aim.x * b.lunge.speed, y: this.aim.y * b.lunge.speed } : stepVelocity(s.body.velocity, move, dt, p);
     s.body.setVelocity(v.x, v.y);
     this.dir = snapDir(this.dir, state === 'chase' ? move : state === 'idle' ? { x: 0, y: 0 } : this.aim);
 
@@ -95,6 +136,7 @@ export class DogAI {
   update(now: number, showDebug: boolean) {
     const s = this.sprite, state = this.brain.state;
     s.setDepth(DEPTH.actors + s.y);
+    if (this.out) return this.knockedOut(now);
     const speed = s.body.velocity.length();
     const anim = speed > 5 && state === 'chase' ? 'walk' : 'idle';
     const { dir, flip } = animDir(this.dir);
@@ -109,14 +151,45 @@ export class DogAI {
 
     // Windup telegraph: flash white, faster as the hit gets close.
     const t = this.brain.t, w = this.breed.brain.windup;
-    if (state === 'windup' && Math.floor(now / (t > w * 0.6 ? 50 : 100)) % 2 === 0) s.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
+    if (this.flashT > 0) s.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
+    else if (state === 'windup' && Math.floor(now / (t > w * 0.6 ? 50 : 100)) % 2 === 0) s.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
     else s.clearTint();
 
     const g = this.marks.clear();
     if (state === 'alert') this.exclaim(g, Math.round(s.x), Math.round(s.y - 34));
     if (state === 'attack') this.swipe(g);
+    const hp = this.health.fraction;
+    if (hp < 1) {
+      // A small bar over the head once hurt, so you can see a fight going your way.
+      const x = Math.round(s.x - 6), y = Math.round(s.y - 31);
+      g.fillStyle(0x241520).fillRect(x - 1, y - 1, 14, 4);
+      g.fillStyle(0xb4443a).fillRect(x, y, Math.max(1, Math.round(12 * hp)), 2);
+    }
 
-    this.label.setVisible(showDebug).setText(state).setPosition(Math.round(s.x), Math.round(s.y - 33));
+    this.label.setVisible(showDebug).setText(`${state} ${this.health.hp}`).setPosition(Math.round(s.x), Math.round(s.y - 35));
+  }
+
+  /** Knocked out: spin in place with stars over the head, then poof into a ring of dust and disappear. */
+  private knockedOut(now: number) {
+    const s = this.sprite, g = this.marks.clear(), t = this.ko;
+    this.label.setVisible(false);
+    s.anims.stop();
+    if (t < DIZZY) {
+      s.setFlipX(Math.floor(now / 90) % 2 === 0).setTint(0xffffff).setTintMode(t < FLASH ? Phaser.TintModes.FILL : Phaser.TintModes.MULTIPLY);
+      for (let i = 0; i < 3; i++) {
+        const a = now / 150 + (i * Math.PI * 2) / 3;
+        g.fillStyle(i % 2 ? 0xe6faf6 : 0xf2a846).fillRect(Math.round(s.x + Math.cos(a) * 7), Math.round(s.y - 31 + Math.sin(a) * 2), 2, 2);
+      }
+      return;
+    }
+    s.setVisible(false);
+    const p = (t - DIZZY) / POOF;
+    if (p >= 1) return;
+    const r = 4 + p * 10;
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI) / 4;
+      g.fillStyle(0xe6faf6, 1 - p).fillRect(Math.round(s.x + Math.cos(a) * r), Math.round(s.y - 10 + Math.sin(a) * r * 0.6), 2, 2);
+    }
   }
 
   /** A "!" above the head: 1×4 bar and a dot, with a dark outline. */
