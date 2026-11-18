@@ -7,6 +7,7 @@ import { CameraRig } from '../camera/cameraRig';
 import { SQUAD } from '../characters';
 import type { CharacterDef } from '../characters/types';
 import { cornerNudge, rectFree, type SolidAt } from '../collision/cornerAssist';
+import { toTile } from '../world/grid';
 import { LocalController } from '../input/localController';
 import { defaultMove, stepVelocity } from '../movement';
 import { Party, SWAP_ACTIONS, type SwapAction } from '../party/party';
@@ -21,11 +22,16 @@ import { gust, windAt } from '../nature/wind';
 import { DEPTH, TILE } from '../world/constants';
 import { loadMap, preloadMap } from '../world/loadMap';
 import { spawnEntities } from '../world/spawner';
+import { Dogs, isDogKind, preloadDogs } from '../dogs/dogs';
+import { BREEDS } from '../dogs/breeds';
+import { DogAI } from '../dogs/dogAI';
+import type { Vec } from '../movement';
 
 const MAP = new URLSearchParams(location.search).get('map') ?? 'test'; // dev: ?map=backyard
 // Dev: ?grass=20000 covers the map in that many blades, with an fps readout (nature blueprint §8, step 2).
 const STRESS_BLADES = Number(new URLSearchParams(location.search).get('grass')) || 0;
 const NUDGE_SPEED = 0.6; // corner assist sideways speed, as a share of top speed
+const HURT = 0.18; // seconds a hit pushes you around before your input counts again
 
 /** Live-tunable values (T panel). Character stats multiply the movement values. */
 // Walking is the default; holding sprint raises speed to sprintSpeed while stamina lasts.
@@ -33,6 +39,7 @@ const NUDGE_SPEED = 0.6; // corner assist sideways speed, as a share of top spee
 export const tuning = {
   walkSpeed: 62, sprintSpeed: 115, accel: defaultMove.accel, decel: defaultMove.decel, ...defaultStamina,
   cameraLerp: 0.15, lookahead: 24, swapCooldown: 4, animSpeed: 1,
+  iframes: 0.8, swapSafe: 0.3, // s: can't be hit again after a hit / right after swapping in
   ...WEATHER[DEFAULT_WEATHER], // replaced by the map's weather on load
 };
 
@@ -49,7 +56,7 @@ function offStage(s: CharSprite) {
 }
 
 export class LevelScene extends Phaser.Scene {
-  private party = new Party(SQUAD, tuning);
+  private party!: Party;
   private controller = new LocalController();
   private sprites: CharSprite[] = [];
   private rig!: CameraRig;
@@ -67,6 +74,10 @@ export class LevelScene extends Phaser.Scene {
   private leaves!: FallingLeaves;
   private hanging!: Hanging;
   private look!: WeatherLook;
+  private dogs!: Dogs;
+  private brains: DogAI[] = [];
+  private hurt = 0;
+  private knock: Vec = { x: 0, y: 0 };
   private readout?: HTMLDivElement;
 
   constructor() {
@@ -80,10 +91,15 @@ export class LevelScene extends Phaser.Scene {
   preload() {
     preloadMap(this, MAP);
     preloadSprites(this, SQUAD);
+    preloadDogs(this);
     preloadTrees(this);
   }
 
   create() {
+    // A restart (whole squad down) reuses this scene object, so everything per-run starts fresh here.
+    this.party = new Party(SQUAD, tuning);
+    this.brains = [];
+    this.hurt = 0;
     const { map, colliders } = loadMap(this, MAP);
     const weather = (map.properties as { name: string; value: unknown }[]).find((p) => p.name === 'weather')?.value;
     Object.assign(tuning, WEATHER[isWeather(weather) ? weather : DEFAULT_WEATHER]);
@@ -102,7 +118,16 @@ export class LevelScene extends Phaser.Scene {
     }
 
     let spawn = { x: map.widthInPixels / 2, y: map.heightInPixels / 2 };
-    spawnEntities(map, { PlayerSpawn: (o) => (spawn = { x: o.x ?? spawn.x, y: o.y ?? spawn.y }) });
+    this.dogs = new Dogs(this);
+    spawnEntities(map, {
+      PlayerSpawn: (o) => (spawn = { x: o.x ?? spawn.x, y: o.y ?? spawn.y }),
+      Dog: (o, p) => {
+        if (!isDogKind(p.kind)) return console.warn(`Dog ${o.id}: unknown kind "${p.kind}"`);
+        const breed = BREEDS[p.kind];
+        if (p.ai === true && breed) this.brains.push(new DogAI(this, p.kind, breed, o.x ?? 0, o.y ?? 0));
+        else this.dogs.add(p.kind, o.x ?? 0, o.y ?? 0, typeof p.anim === 'string' ? { anim: p.anim, dir: String(p.dir ?? 'south') } : undefined);
+      },
+    });
 
     // All four exist, but only the active one is enabled; the others are off stage (players blueprint §2).
     this.sprites = SQUAD.map((def) => {
@@ -116,7 +141,11 @@ export class LevelScene extends Phaser.Scene {
     });
     onStage(this.active, spawn.x, spawn.y);
     this.trees = new Trees(this, map.getObjectLayer('Trees')?.objects ?? []);
-    this.physics.add.collider(this.sprites, [...colliders, ...this.trees.bodies]);
+    const thinking = this.brains.map((d) => d.sprite);
+    this.physics.add.collider(this.sprites, [...colliders, ...this.trees.bodies, ...this.dogs.sprites, ...thinking]);
+    this.physics.add.collider(thinking, [...colliders, ...this.trees.bodies, ...this.dogs.sprites]);
+    const nav = this.navGrid(map.width, map.height, [...this.trees.bodies, ...this.dogs.sprites.map((d) => d.body as Phaser.Physics.Arcade.Body)]);
+    for (const d of this.brains) d.nav = nav;
     this.leaves = new FallingLeaves(this, this.trees.sources);
     this.hanging = new Hanging(this, map.getObjectLayer('Hanging')?.objects ?? []);
     this.look = new WeatherLook(this, tuning.light);
@@ -158,6 +187,14 @@ export class LevelScene extends Phaser.Scene {
     if (swap) this.trySwap(swap);
 
     const s = this.active;
+    for (const d of this.brains) d.step(dt, s, tuning, (push, damage) => this.hit(push, damage));
+    if (!this.active.active) return; // squad wiped, restarting
+    if (this.hurt > 0) {
+      // Knocked back: the push fades out and your input waits, so the hit reads.
+      this.hurt = Math.max(0, this.hurt - dt);
+      s.body.setVelocity(this.knock.x * (this.hurt / HURT), this.knock.y * (this.hurt / HURT));
+      return;
+    }
     const p = this.moveParams(this.party.active, this.sprinting);
     // Exhausted (bar just ran dry): walk slower. Animation speed still compares to the normal walk, so the legs look heavy.
     p.maxSpeed *= this.party.stamina[this.party.activeIndex].speedFactor;
@@ -180,9 +217,25 @@ export class LevelScene extends Phaser.Scene {
     const result = this.party.trySwap(this.party.targetFor(action), (def) => this.fits(def, from.x, from.y));
     // A press that lands on the cooldown stays buffered, so pressing just before it ends still swaps.
     if (result !== 'cooldown') this.controller.consume(action);
-    if (result === 'no-room') this.flash(from, 0xff4040);
-    if (result !== 'ok') return;
+    if (result === 'no-room' || result === 'downed') this.flash(from, 0xff4040);
+    if (result === 'ok') this.swapIn(from);
+  }
 
+  /**
+   * Tiles dogs path around: solid tiles plus any tile a trunk or standing dog's body touches.
+   * shortcut: built once, so it doesn't know about things that move or appear later; rebuild it when they exist.
+   */
+  private navGrid(w: number, h: number, bodies: { x: number; y: number; width: number; height: number }[]): SolidAt {
+    const blocked = new Uint8Array(w * h);
+    for (let ty = 0; ty < h; ty++) for (let tx = 0; tx < w; tx++) blocked[ty * w + tx] = this.solid(tx, ty) ? 1 : 0;
+    for (const b of bodies)
+      for (let ty = toTile(b.y); ty <= toTile(b.y + b.height - 0.001); ty++)
+        for (let tx = toTile(b.x); tx <= toTile(b.x + b.width - 0.001); tx++) if (tx >= 0 && ty >= 0 && tx < w && ty < h) blocked[ty * w + tx] = 1;
+    return (tx, ty) => tx < 0 || ty < 0 || tx >= w || ty >= h || blocked[ty * w + tx] === 1;
+  }
+
+  /** The party already switched members: put the new one where `from` stood. */
+  private swapIn(from: CharSprite) {
     const to = this.active;
     const { x: vx, y: vy } = from.body.velocity;
     offStage(from);
@@ -199,6 +252,26 @@ export class LevelScene extends Phaser.Scene {
     return r.x >= w.x && r.x + r.w <= w.right && r.y >= w.y && r.y + r.h <= w.bottom && rectFree(r, this.solid);
   }
 
+  /** A dog's attack reached the active character (collision blueprint §7): damage, knockback, flash, maybe going down. */
+  private hit(push: Vec, damage: number) {
+    const i = this.party.activeIndex, health = this.party.health[i];
+    if (!health.take(damage, tuning.iframes)) return; // invincible: no push either
+    this.hurt = HURT;
+    this.knock = push;
+    this.flash(this.active, 0xb4443a);
+    if (!health.down) return;
+    // Down: forced swap to the next one standing, ignoring the cooldown (players blueprint §2). Nobody left: start over.
+    const from = this.active;
+    this.hurt = 0;
+    if (this.party.forceSwap()) return this.swapIn(from);
+    // shortcut: no checkpoints yet, so a wipe restarts the level; restart from the last checkpoint once they exist.
+    offStage(from);
+    this.time.delayedCall(800, () => {
+      this.scene.stop('hud');
+      this.scene.restart();
+    });
+  }
+
   private flash(s: CharSprite, color: number) {
     s.setTint(color).setTintMode(Phaser.TintModes.FILL);
     this.time.delayedCall(80, () => s.clearTint());
@@ -207,6 +280,8 @@ export class LevelScene extends Phaser.Scene {
   update(_time: number, delta: number) {
     const s = this.active;
     s.setDepth(DEPTH.actors + s.y); // y-sort by feet
+    // Invincibility frames show as flicker.
+    s.setAlpha(this.party.health[this.party.activeIndex].invulnerable && Math.floor(this.time.now / 60) % 2 ? 0.3 : 1);
     const { sprite } = this.party.active;
     // Placeholders show facing with a dot; real art shows it with the animation.
     this.facingDot.setVisible(!sprite).setPosition(s.x + this.facing.x * 5, s.y - 14 + this.facing.y * 5).setDepth(s.depth + 0.5);
@@ -229,6 +304,8 @@ export class LevelScene extends Phaser.Scene {
     this.leaves.update(this.time.now / 1000, Math.min(delta / 1000, 0.05), tuning);
     this.hanging.update(this.time.now / 1000, Math.min(delta / 1000, 0.05), tuning);
     this.look.update(Math.min(delta / 1000, 0.05), tuning.light);
+    this.dogs.face(this.active.x, this.active.y - 8);
+    for (const d of this.brains) d.update(this.time.now, this.physics.world.drawDebug);
     if (this.grass) {
       const start = performance.now();
       const forces = [footForce(s.x, s.y, this.party.active.body.w)];

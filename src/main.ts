@@ -33,6 +33,8 @@ const { panel, sync } = tuningPanel(tuning, {
   cameraLerp: [0.02, 1, 0.01],
   lookahead: [0, 48, 1],
   swapCooldown: [0, 10, 0.5],
+  iframes: [0, 2, 0.05],
+  swapSafe: [0, 1, 0.05],
   sprintSpeed: [20, 300, 5],
   drainTime: [0.5, 10, 0.25],
   regenTime: [0.5, 10, 0.25],
