@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
-import { type BrainDef, newBrain, think } from './dogBrain';
+import { type BrainDef, hurt, newBrain, think } from './dogBrain';
 
-const def: BrainDef = { sight: 100, lose: 150, reach: 20, alert: 0.3, windup: 0.4, attack: 0.1, recover: 0.5 };
+const def: BrainDef = { sight: 100, lose: 150, reach: 20, alert: 0.3, windup: 0.4, attack: 0.1, recover: 0.5, stagger: 0.3 };
 
 /** Runs the brain in 1/60 s steps for `seconds` at a fixed distance; returns the states it entered. */
 const run = (b = newBrain(), dist: number | null, seconds: number) => {
@@ -41,4 +41,15 @@ test('it gives up once the target is past the lose distance, not at the sight ed
   const { b } = run(undefined, 90, 0.5);
   expect(run(b, 120, 1).b.state).toBe('chase');
   expect(run(b, 160, 0.1).entered).toEqual(['idle']);
+});
+
+test('a hard hit cancels a windup; any hit wakes a sleeping dog', () => {
+  const { b } = run(undefined, 90, 0.5);
+  run(b, 10, 0.1); // winding up
+  hurt(b, true);
+  expect(b.state).toBe('stagger');
+  expect(run(b, 10, 0.4).entered).toEqual(['chase', 'windup']);
+  const idle = newBrain();
+  hurt(idle, false);
+  expect(idle.state).toBe('chase');
 });

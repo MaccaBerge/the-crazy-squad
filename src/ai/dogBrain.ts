@@ -1,7 +1,7 @@
 // The dog's decision layer (dog AI blueprint §3): a small state machine with no Phaser in it, so it can be unit-tested.
 // Step 1 of the build order: idle → alert → chase → windup → attack → recover. No tokens, hearing, walls or pathing yet.
 
-export const DOG_STATES = ['idle', 'alert', 'chase', 'windup', 'attack', 'recover'] as const;
+export const DOG_STATES = ['idle', 'alert', 'chase', 'windup', 'attack', 'recover', 'stagger'] as const;
 export type DogState = (typeof DOG_STATES)[number];
 
 /** How one breed decides. Distances in px between feet, times in seconds. */
@@ -13,11 +13,21 @@ export type BrainDef = {
   windup: number; // telegraph before the hit, at least 0.3 s
   attack: number; // the active part, where the hit can land
   recover: number; // standing open to hits afterwards
+  stagger: number; // knocked off balance by a hard hit: its attack is cancelled
 };
 
 export type Brain = { state: DogState; t: number }; // t = seconds in the current state
 
 export const newBrain = (): Brain => ({ state: 'idle', t: 0 });
+
+/**
+ * The dog was hit (combat blueprint §6). A hit harder than its poise staggers it, cancelling any windup or attack.
+ * Either way a sleeping dog wakes up and comes for you.
+ */
+export function hurt(b: Brain, staggered: boolean) {
+  const next = staggered ? 'stagger' : b.state === 'idle' || b.state === 'alert' ? 'chase' : b.state;
+  if (next !== b.state || staggered) Object.assign(b, { state: next, t: 0 });
+}
 
 /**
  * Advances the brain by dt. `dist` is the distance to the target, or null when there is none.
@@ -49,6 +59,9 @@ function decide({ state, t }: Brain, def: BrainDef, dist: number | null): DogSta
       return t >= def.attack ? 'recover' : 'attack';
     case 'recover':
       if (t < def.recover) return 'recover';
+      return lost ? 'idle' : 'chase';
+    case 'stagger':
+      if (t < def.stagger) return 'stagger';
       return lost ? 'idle' : 'chase';
   }
 }
