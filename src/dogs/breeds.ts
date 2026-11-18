@@ -16,7 +16,7 @@ export const BREEDS: Partial<Record<DogKind, Breed>> = {
   bruiser: {
     speed: 0.8,
     accel: 0.7,
-    brain: { sight: 110, lose: 170, reach: 22, alert: 0.35, windup: 0.5, attack: 0.15, recover: 0.6 },
+    brain: { sight: 140, lose: 200, reach: 22, alert: 0.35, windup: 0.5, attack: 0.15, recover: 0.6 },
     lunge: { speed: 140, reach: 14, radius: 10, knockback: 220, damage: 25 },
   },
 };
