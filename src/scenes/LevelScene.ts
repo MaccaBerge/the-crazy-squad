@@ -7,6 +7,7 @@ import { CameraRig } from '../camera/cameraRig';
 import { SQUAD } from '../characters';
 import type { CharacterDef } from '../characters/types';
 import { cornerNudge, rectFree, type SolidAt } from '../collision/cornerAssist';
+import { toTile } from '../world/grid';
 import { LocalController } from '../input/localController';
 import { defaultMove, stepVelocity } from '../movement';
 import { Party, SWAP_ACTIONS, type SwapAction } from '../party/party';
@@ -143,6 +144,8 @@ export class LevelScene extends Phaser.Scene {
     const thinking = this.brains.map((d) => d.sprite);
     this.physics.add.collider(this.sprites, [...colliders, ...this.trees.bodies, ...this.dogs.sprites, ...thinking]);
     this.physics.add.collider(thinking, [...colliders, ...this.trees.bodies, ...this.dogs.sprites]);
+    const nav = this.navGrid(map.width, map.height, [...this.trees.bodies, ...this.dogs.sprites.map((d) => d.body as Phaser.Physics.Arcade.Body)]);
+    for (const d of this.brains) d.nav = nav;
     this.leaves = new FallingLeaves(this, this.trees.sources);
     this.hanging = new Hanging(this, map.getObjectLayer('Hanging')?.objects ?? []);
     this.look = new WeatherLook(this, tuning.light);
@@ -216,6 +219,19 @@ export class LevelScene extends Phaser.Scene {
     if (result !== 'cooldown') this.controller.consume(action);
     if (result === 'no-room' || result === 'downed') this.flash(from, 0xff4040);
     if (result === 'ok') this.swapIn(from);
+  }
+
+  /**
+   * Tiles dogs path around: solid tiles plus any tile a trunk or standing dog's body touches.
+   * shortcut: built once, so it doesn't know about things that move or appear later; rebuild it when they exist.
+   */
+  private navGrid(w: number, h: number, bodies: { x: number; y: number; width: number; height: number }[]): SolidAt {
+    const blocked = new Uint8Array(w * h);
+    for (let ty = 0; ty < h; ty++) for (let tx = 0; tx < w; tx++) blocked[ty * w + tx] = this.solid(tx, ty) ? 1 : 0;
+    for (const b of bodies)
+      for (let ty = toTile(b.y); ty <= toTile(b.y + b.height - 0.001); ty++)
+        for (let tx = toTile(b.x); tx <= toTile(b.x + b.width - 0.001); tx++) if (tx >= 0 && ty >= 0 && tx < w && ty < h) blocked[ty * w + tx] = 1;
+    return (tx, ty) => tx < 0 || ty < 0 || tx >= w || ty >= h || blocked[ty * w + tx] === 1;
   }
 
   /** The party already switched members: put the new one where `from` stood. */

@@ -1,8 +1,11 @@
 import * as Phaser from 'phaser';
 import { type Dir, snapDir } from '../art/facing';
 import { type Brain, newBrain, think } from '../ai/dogBrain';
+import { type Cell, cellFeet, clearLine, findPath } from '../ai/path';
+import type { SolidAt } from '../collision/cornerAssist';
 import { stepVelocity, type Vec } from '../movement';
 import { DEPTH } from '../world/constants';
+import { toTile } from '../world/grid';
 import { animDir, type Breed } from './breeds';
 import type { DogKind } from './dogs';
 
@@ -14,10 +17,12 @@ export type DogTuning = { walkSpeed: number; accel: number; decel: number };
 
 const BODY = { w: 12, h: 6 }; // feet only, like the squad
 const FRAME = 32;
+const REPATH = 0.3; // s between path searches while the way is blocked
 
 /**
  * One thinking dog (dog AI blueprint §11): the brain decides, this turns it into movement, animation and the hit.
- * Step 1 only: it sees through walls, steers straight at you, and nobody shares attack tokens yet.
+ * It walks straight at you when it can and finds a way round obstacles when it can't (§4, §6).
+ * Still missing: sight through walls is allowed, and nobody shares attack tokens yet.
  */
 export class DogAI {
   readonly sprite: DogSprite;
@@ -27,6 +32,10 @@ export class DogAI {
   private landed = false;
   private marks: Phaser.GameObjects.Graphics;
   private label: Phaser.GameObjects.Text;
+  /** Tiles a dog can't walk through (walls, water, trunks, standing dogs). Without it the dog steers straight. */
+  nav?: SolidAt;
+  private path: Cell[] = [];
+  private repath = 0;
 
   constructor(private scene: Phaser.Scene, readonly kind: DogKind, private breed: Breed, x: number, y: number) {
     this.sprite = scene.physics.add.sprite(x, y, `dog-${kind}`, 2).setOrigin(0.5, 1) as DogSprite;
@@ -49,7 +58,11 @@ export class DogAI {
     if (entered === 'attack') this.landed = false;
 
     let move = { x: 0, y: 0 };
-    if (state === 'chase' && to && dist) move = { x: to.x / dist, y: to.y / dist };
+    if (state === 'chase' && target) {
+      const goal = this.steer(target, dt);
+      const gx = goal.x - s.x, gy = goal.y - s.y, gd = Math.hypot(gx, gy);
+      if (gd > 0.5) move = { x: gx / gd, y: gy / gd };
+    } else this.path = [];
     const p = { maxSpeed: t.walkSpeed * b.speed, accel: t.accel * b.accel, decel: t.decel * b.accel };
     const v = state === 'attack' ? { x: this.aim.x * b.lunge.speed, y: this.aim.y * b.lunge.speed } : stepVelocity(s.body.velocity, move, dt, p);
     s.body.setVelocity(v.x, v.y);
@@ -62,6 +75,20 @@ export class DogAI {
         onHit({ x: this.aim.x * b.lunge.knockback, y: this.aim.y * b.lunge.knockback }, b.lunge.damage);
       }
     }
+  }
+
+  /** Where to head now: straight at the target if the way is clear, else the furthest path cell in plain sight. */
+  private steer(target: { x: number; y: number }, dt: number) {
+    const s = this.sprite, nav = this.nav;
+    if (!nav || clearLine(nav, s, target, BODY)) return (this.path = []), target;
+    this.repath -= dt;
+    if (!this.path.length || this.repath <= 0) {
+      const cell = (p: { x: number; y: number }) => ({ x: toTile(p.x), y: toTile(p.y - BODY.h / 2) });
+      this.path = findPath(nav, cell(s), cell(target)) ?? [];
+      this.repath = REPATH;
+    }
+    while (this.path.length > 1 && clearLine(nav, s, cellFeet(this.path[1], BODY.h), BODY)) this.path.shift();
+    return this.path.length ? cellFeet(this.path[0], BODY.h) : target; // no way there: push straight at it
   }
 
   /** Per rendered frame: animation, y-sort, the telegraph and the debug label. */
