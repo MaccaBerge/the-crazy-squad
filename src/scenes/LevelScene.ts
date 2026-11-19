@@ -208,11 +208,13 @@ export class LevelScene extends Phaser.Scene {
 
     const s = this.active;
     const pack = this.brains.filter((d) => !d.out), feet = pack.map((d) => d.sprite);
-    // Every dog that's after you gets its own spot round you; a spot inside a wall falls back to you.
-    const hunters = pack.filter((d) => d.state !== 'idle');
-    // A big gang widens the ring so every dog keeps packSpace; the ones too far out to bite wait their turn there.
-    const ring = Math.max(tuning.packRing, (hunters.length * tuning.packSpace) / (Math.PI * 2));
-    const slots = new Map(ringSlots(s, hunters.map((d) => d.sprite), ring).map((p, i) => [hunters[i], p]));
+    // Every dog that's after you gets its own spot round you. The closest ones that fit (packSpace apart) take the inner
+    // ring, within biting reach; the rest wait in an outer ring and step in as spots free up (dog AI blueprint §5).
+    const hunters = pack.filter((d) => d.state !== 'idle').sort((a, b) => Phaser.Math.Distance.BetweenPoints(a.sprite, s) - Phaser.Math.Distance.BetweenPoints(b.sprite, s));
+    const fit = Math.max(1, Math.floor((Math.PI * 2 * tuning.packRing) / tuning.packSpace));
+    const slots = new Map<DogAI, Vec>();
+    for (const [ring, group] of [[tuning.packRing, hunters.slice(0, fit)], [tuning.packRing + tuning.packSpace, hunters.slice(fit)]] as const)
+      ringSlots(s, group.map((d) => d.sprite), ring).forEach((p, i) => slots.set(group[i], p));
     const open = (p?: Vec) => (p && !this.solid(toTile(p.x), toTile(p.y - 3)) ? p : undefined);
     pack.forEach((d, i) => d.step(dt, s, tuning, (push, damage) => this.hit(push, damage), separation(feet, i, tuning.packSpace), open(slots.get(d))));
     for (const d of this.brains) if (d.out) d.step(dt, s, tuning, () => {}); // knocked out: only its timers run
