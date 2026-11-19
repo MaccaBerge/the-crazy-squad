@@ -60,6 +60,10 @@ export class DogAI {
     this.health = new Health(breed.maxHp);
   }
 
+  get state() {
+    return this.brain.state;
+  }
+
   /** Out of the fight: no hits, no attacks, no collisions. */
   get out() {
     return this.ko >= 0;
@@ -87,8 +91,9 @@ export class DogAI {
   /**
    * Fixed physics step: think, then move. `onHit` fires once per attack that reaches the target, with the push and damage.
    * `crowd` is the push away from packmates (separation), mixed into its steering.
+   * `slot` is its own spot in the ring round the target: it chases that instead of the target itself, so a pack surrounds you.
    */
-  step(dt: number, target: { x: number; y: number } | undefined, t: DogTuning, onHit: (push: Vec, damage: number) => void, crowd: Vec = { x: 0, y: 0 }) {
+  step(dt: number, target: { x: number; y: number } | undefined, t: DogTuning, onHit: (push: Vec, damage: number) => void, crowd: Vec = { x: 0, y: 0 }, slot?: Vec) {
     const s = this.sprite, b = this.breed;
     this.health.tick(dt);
     this.flashT = Math.max(0, this.flashT - dt);
@@ -103,7 +108,7 @@ export class DogAI {
 
     let move = { x: 0, y: 0 };
     if (state === 'chase' && target) {
-      const goal = this.steer(target, dt);
+      const goal = this.steer(slot ?? target, dt);
       const gx = goal.x - s.x, gy = goal.y - s.y, gd = Math.hypot(gx, gy);
       if (gd > 0.5) move = { x: gx / gd, y: gy / gd };
     } else this.path = [];

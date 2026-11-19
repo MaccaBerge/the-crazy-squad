@@ -21,3 +21,25 @@ export function separation(all: readonly Vec[], self: number, radius: number): V
   });
   return { x, y };
 }
+
+/**
+ * Spots on a ring round `center`, one per dog, spread evenly (dog AI blueprint §5's ring).
+ * Dogs keep the order they already stand in round the center, so nobody has to cross the circle to reach its spot.
+ */
+export function ringSlots(center: Vec, dogs: readonly Vec[], radius: number): Vec[] {
+  const angle = (p: Vec) => Math.atan2(p.y - center.y, p.x - center.x);
+  const order = dogs.map((_, i) => i).sort((a, b) => angle(dogs[a]) - angle(dogs[b]));
+  const slots: Vec[] = new Array(dogs.length);
+  if (!dogs.length) return slots;
+  // Turn the whole ring so its spots sit as close as possible to where the dogs already are.
+  const step = (Math.PI * 2) / dogs.length;
+  const offset = Math.atan2(
+    order.reduce((s, i, k) => s + Math.sin(angle(dogs[i]) - k * step), 0),
+    order.reduce((s, i, k) => s + Math.cos(angle(dogs[i]) - k * step), 0),
+  );
+  order.forEach((i, k) => {
+    const a = offset + k * step;
+    slots[i] = { x: center.x + Math.cos(a) * radius, y: center.y + Math.sin(a) * radius };
+  });
+  return slots;
+}

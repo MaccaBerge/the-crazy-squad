@@ -27,7 +27,7 @@ import { BREEDS } from '../dogs/breeds';
 import { DogAI } from '../dogs/dogAI';
 import type { Vec } from '../movement';
 import { inArc, type Swing, swingPhase } from '../combat/swing';
-import { separation } from '../ai/separation';
+import { ringSlots, separation } from '../ai/separation';
 
 const MAP = new URLSearchParams(location.search).get('map') ?? 'test'; // dev: ?map=backyard
 // Dev: ?grass=20000 covers the map in that many blades, with an fps readout (nature blueprint §8, step 2).
@@ -45,6 +45,7 @@ export const tuning = {
   iframes: 0.8, swapSafe: 0.3, // s: can't be hit again after a hit / right after swapping in
   hitstop: 50, heavyHitstop: 80, // ms the world freezes when a hit lands (combat blueprint §5)
   packSpace: 22, packPush: 1.5, // px dogs keep between them, and how hard they steer apart
+  packRing: 18, // px from you to each hunting dog's spot in the ring (inside their reach, so they can still bite)
   ...WEATHER[DEFAULT_WEATHER], // replaced by the map's weather on load
 };
 
@@ -207,7 +208,11 @@ export class LevelScene extends Phaser.Scene {
 
     const s = this.active;
     const pack = this.brains.filter((d) => !d.out), feet = pack.map((d) => d.sprite);
-    pack.forEach((d, i) => d.step(dt, s, tuning, (push, damage) => this.hit(push, damage), separation(feet, i, tuning.packSpace)));
+    // Every dog that's after you gets its own spot round you; a spot inside a wall falls back to you.
+    const hunters = pack.filter((d) => d.state !== 'idle');
+    const slots = new Map(ringSlots(s, hunters.map((d) => d.sprite), tuning.packRing).map((p, i) => [hunters[i], p]));
+    const open = (p?: Vec) => (p && !this.solid(toTile(p.x), toTile(p.y - 3)) ? p : undefined);
+    pack.forEach((d, i) => d.step(dt, s, tuning, (push, damage) => this.hit(push, damage), separation(feet, i, tuning.packSpace), open(slots.get(d))));
     for (const d of this.brains) if (d.out) d.step(dt, s, tuning, () => {}); // knocked out: only its timers run
     if (!this.active.active) return; // squad wiped, restarting
     this.attack(intent.pressed.has('attack'), dt);
