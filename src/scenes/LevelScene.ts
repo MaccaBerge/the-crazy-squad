@@ -268,7 +268,8 @@ export class LevelScene extends Phaser.Scene {
     const kinds = DOG_KINDS.filter((k) => BREEDS[k]);
     const kind = kinds[this.spawned++ % kinds.length], breed = BREEDS[kind]!;
     const s = this.active, bounds = this.physics.world.bounds;
-    const at = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => ({ x: s.x + Math.cos(i * Math.PI / 4) * 64, y: s.y + Math.sin(i * Math.PI / 4) * 64 }))
+    // Each spawn starts the search one step further round, so several dogs don't land in a pile.
+    const at = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => (i + this.spawned * 3) * Math.PI / 4).map((a) => ({ x: s.x + Math.cos(a) * 64, y: s.y + Math.sin(a) * 64 }))
       .find((p) => bounds.contains(p.x, p.y) && rectFree({ x: p.x - 6, y: p.y - 6, w: 12, h: 6 }, this.solid));
     if (!at) return this.flash(s, 0xff4040); // boxed in: nowhere to put one
     const d = new DogAI(this, kind, breed, at.x, at.y);
