@@ -185,6 +185,14 @@ export class LevelScene extends Phaser.Scene {
       if (!world.drawDebug) world.debugGraphic?.clear();
     });
 
+    // Dev: the mouse wheel or -/+ zooms the view out and in, 0 resets. For testing only: below 1× the pixels shimmer.
+    const cam = this.cameras.main;
+    const zoomTo = (z: number) => cam.setZoom(Phaser.Math.Clamp(z, 0.25, 3));
+    this.input.on('wheel', (_p: unknown, _o: unknown, _dx: number, dy: number) => zoomTo(cam.zoom * Math.exp(-dy * 0.002))); // smooth on trackpads too
+    this.input.keyboard!.on('keydown-MINUS', () => zoomTo(cam.zoom / 1.25));
+    this.input.keyboard!.on('keydown-PLUS', () => zoomTo(cam.zoom * 1.25));
+    this.input.keyboard!.on('keydown-ZERO', () => zoomTo(1));
+
     // Dev: N drops a fighting dog near you, cycling through the breeds.
     this.input.keyboard!.on('keydown-N', (e: KeyboardEvent) => !e.repeat && this.spawnDog()); // holding N spawns one, not a stream
 
