@@ -216,7 +216,8 @@ export class LevelScene extends Phaser.Scene {
     const slots = new Map<DogAI, Vec>();
     for (const [ring, group] of [[tuning.packRing, hunters.slice(0, fit)], [tuning.packRing + tuning.packSpace, hunters.slice(fit)]] as const)
       ringSlots(s, group.map((d) => d.sprite), ring).forEach((p, i) => slots.set(group[i], p));
-    const open = (p?: Vec) => (p && !this.solid(toTile(p.x), toTile(p.y - 3)) ? p : undefined);
+    // The nav grid also counts off-map tiles, trunks and standing dogs as blocked: a spot there would send a dog searching for nowhere.
+    const open = (p?: Vec) => (p && this.nav && !this.nav(toTile(p.x), toTile(p.y - 3)) ? p : undefined);
     // Dogs that are after you and still close enough to track you warn every packmate within warnRange, so the whole gang
     // comes, not only the ones with you in sight. Each warned dog that gets close enough passes it on in turn.
     const trackers = hunters.filter((d) => Phaser.Math.Distance.BetweenPoints(d.sprite, s) <= d.lose).map((d) => d.sprite);

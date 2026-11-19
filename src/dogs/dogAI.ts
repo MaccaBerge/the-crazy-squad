@@ -139,9 +139,11 @@ export class DogAI {
   /** Where to head now: straight at the target if the way is clear, else the furthest path cell in plain sight. */
   private steer(target: { x: number; y: number }, dt: number) {
     const s = this.sprite, nav = this.nav;
-    if (!nav || clearLine(nav, s, target, BODY)) return (this.path = []), target;
+    // Clear way: no path needed, and the next time it's blocked it searches straight away.
+    if (!nav || clearLine(nav, s, target, BODY)) return (this.path = []), (this.repath = 0), target;
     this.repath -= dt;
-    if (!this.path.length || this.repath <= 0) {
+    // Only every REPATH seconds, also after a failed search: retrying a failed one every step made big packs crawl.
+    if (this.repath <= 0) {
       const cell = (p: { x: number; y: number }) => ({ x: toTile(p.x), y: toTile(p.y - BODY.h / 2) });
       this.path = findPath(nav, cell(s), cell(target)) ?? [];
       this.repath = REPATH;
