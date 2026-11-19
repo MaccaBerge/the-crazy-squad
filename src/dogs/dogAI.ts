@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { type Dir, snapDir } from '../art/facing';
 import { type Brain, hurt, newBrain, think } from '../ai/dogBrain';
-import { type Cell, cellFeet, clearLine, findPath } from '../ai/path';
+import { type Cell, cellFeet, clearLine, findPath, lineOfSight } from '../ai/path';
 import type { SolidAt } from '../collision/cornerAssist';
 import { Health } from '../collision/hits';
 import { stepVelocity, type Vec } from '../movement';
@@ -19,6 +19,8 @@ export type DogTuning = { walkSpeed: number; accel: number; decel: number; packP
 const BODY = { w: 12, h: 6 }; // feet only, like the squad
 const FRAME = 32;
 const REPATH = 0.3; // s between path searches while the way is blocked
+const EYES = 8; // px above the feet a dog looks from, and where it looks at you
+const ARRIVED = 10; // px from the last seen spot that counts as there
 const IFRAMES = 0.1; // s a dog ignores hits after one lands: short, so fast combos connect (combat blueprint §6)
 const KNOCK = 0.15; // s a hit pushes the dog around
 const FLASH = 0.06; // s of white after a hit
@@ -40,6 +42,12 @@ export class DogAI {
   private label: Phaser.GameObjects.Text;
   /** Tiles a dog can't walk through (walls, water, trunks, standing dogs). Without it the dog steers straight. */
   nav?: SolidAt;
+  /** Tiles a dog can't see through (walls). Without it the dog sees through everything. */
+  sight?: SolidAt;
+  /** Where it last saw you, or was told you were: it searches here when it loses you. */
+  private lastSeen?: Vec;
+  /** It can see the target itself this step (not just told): only these dogs warn packmates. */
+  seesTarget = false;
   private path: Cell[] = [];
   private repath = 0;
   readonly health: Health;
@@ -62,11 +70,6 @@ export class DogAI {
 
   get state() {
     return this.brain.state;
-  }
-
-  /** How far away it keeps tracking a target once it's after it. */
-  get lose() {
-    return this.breed.brain.lose;
   }
 
   /** Out of the fight: no hits, no attacks, no collisions. */
@@ -106,15 +109,21 @@ export class DogAI {
     if (this.out) return void (this.ko += dt);
     const to = target && { x: target.x - s.x, y: target.y - s.y };
     const dist = to ? Math.hypot(to.x, to.y) : null;
-    const entered = think(this.brain, b.brain, dist, dt, told);
+    const eye = (p: Vec) => ({ x: p.x, y: p.y - EYES });
+    const visible = !!target && (!this.sight || lineOfSight(this.sight, eye(s), eye(target)));
+    this.seesTarget = visible && dist !== null && dist <= b.brain.lose && this.brain.state !== 'idle';
+    if (target && (this.seesTarget || told)) this.lastSeen = { x: target.x, y: target.y };
+    const arrived = !!this.lastSeen && Math.hypot(this.lastSeen.x - s.x, this.lastSeen.y - s.y) <= ARRIVED;
+    const entered = think(this.brain, b.brain, { dist, visible, told, arrived }, dt);
     const state = this.brain.state;
 
     if (to && dist && (entered === 'windup' || entered === 'alert')) this.aim = { x: to.x / dist, y: to.y / dist }; // aim locks at windup: you can sidestep it
     if (entered === 'attack') this.landed = false;
 
     let move = { x: 0, y: 0 };
-    if (state === 'chase' && target) {
-      const goal = this.steer(slot ?? target, dt);
+    const heading = state === 'chase' && target ? slot ?? target : state === 'search' ? this.lastSeen : undefined;
+    if (heading) {
+      const goal = this.steer(heading, dt);
       const gx = goal.x - s.x, gy = goal.y - s.y, gd = Math.hypot(gx, gy);
       if (gd > 0.5) move = { x: gx / gd, y: gy / gd };
     } else this.path = [];
@@ -125,7 +134,7 @@ export class DogAI {
     const v = this.knockT > 0 ? (this.knockT = Math.max(0, this.knockT - dt), { x: this.knock.x * (this.knockT / KNOCK), y: this.knock.y * (this.knockT / KNOCK) })
       : state === 'attack' ? { x: this.aim.x * b.lunge.speed + apart.x * p.maxSpeed, y: this.aim.y * b.lunge.speed + apart.y * p.maxSpeed } : stepVelocity(s.body.velocity, move, dt, p);
     s.body.setVelocity(v.x, v.y);
-    this.dir = snapDir(this.dir, state === 'chase' ? move : state === 'idle' ? { x: 0, y: 0 } : this.aim);
+    this.dir = snapDir(this.dir, heading ? move : state === 'idle' || state === 'lost' ? { x: 0, y: 0 } : this.aim);
 
     if (state === 'attack' && !this.landed && target) {
       const hx = s.x + this.aim.x * b.lunge.reach, hy = s.y + this.aim.y * b.lunge.reach;
@@ -158,7 +167,7 @@ export class DogAI {
     s.setDepth(DEPTH.actors + s.y);
     if (this.out) return this.knockedOut(now);
     const speed = s.body.velocity.length();
-    const anim = speed > 5 && state === 'chase' ? 'walk' : 'idle';
+    const anim = speed > 5 && (state === 'chase' || state === 'search') ? 'walk' : 'idle';
     const { dir, flip } = animDir(this.dir);
     const key = `dog-${this.kind}/${anim}-${dir}`;
     if (!this.scene.anims.exists(key)) {
@@ -176,7 +185,8 @@ export class DogAI {
     else s.clearTint();
 
     const g = this.marks.clear();
-    if (state === 'alert') this.exclaim(g, Math.round(s.x), Math.round(s.y - 34));
+    // Speech bubbles: "!" while it tells the pack it has seen you, "?" when your trail has gone cold.
+    if (state === 'alert' || state === 'lost') this.bubble(g, Math.round(s.x), Math.round(s.y - (this.health.fraction < 1 ? 33 : 30)), state === 'alert' ? '!' : '?', this.brain.t);
     if (state === 'attack') this.swipe(g);
     const hp = this.health.fraction;
     if (hp < 1) {
@@ -212,10 +222,17 @@ export class DogAI {
     }
   }
 
-  /** A "!" above the head: 1×4 bar and a dot, with a dark outline. */
-  private exclaim(g: Phaser.GameObjects.Graphics, x: number, y: number) {
-    g.fillStyle(0x241520).fillRect(x - 1, y - 1, 3, 8);
-    g.fillStyle(0xf2a846).fillRect(x, y, 1, 4).fillRect(x, y + 5, 1, 1);
+  /**
+   * A small speech bubble with its tail on (x, y): a pale 7×9 box with a dark outline, holding a red "!" or a dark "?".
+   * It pops up a pixel for its first moment, so it catches the eye.
+   */
+  private bubble(g: Phaser.GameObjects.Graphics, x: number, y: number, glyph: '!' | '?', age: number) {
+    if (age < 0.08) y -= 1;
+    const l = x - 4, top = y - 12;
+    g.fillStyle(0x241520).fillRect(l, top, 9, 11).fillRect(x - 1, top + 11, 3, 1).fillRect(x, top + 12, 1, 1); // outline and tail
+    g.fillStyle(0xe6faf6).fillRect(l + 1, top + 1, 7, 9).fillRect(x, top + 10, 1, 1);
+    if (glyph === '!') g.fillStyle(0xb4443a).fillRect(x, top + 2, 1, 4).fillRect(x, top + 7, 1, 1);
+    else g.fillStyle(0x241520).fillRect(x - 1, top + 2, 2, 1).fillRect(x + 1, top + 3, 1, 1).fillRect(x, top + 4, 1, 1).fillRect(x, top + 7, 1, 1);
   }
 
   /** Placeholder for the club: a short pale arc where the hit circle is. */

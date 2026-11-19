@@ -18,7 +18,7 @@ export type Breed = {
 
 // Starting numbers (blueprint §7.1 speeds, combat blueprint §6 HP), to tune in play.
 // shortcut: everyone uses the Bruiser's lunge for now; guns, the shield and bombs come with the dog side of combat (combat blueprint §9, step 8).
-const brain = { sight: 140, lose: 200, reach: 22, alert: 0.35, windup: 0.5, attack: 0.15, recover: 0.6, stagger: 0.4 };
+const brain = { sight: 140, lose: 200, reach: 22, alert: 0.7, windup: 0.5, attack: 0.15, recover: 0.6, stagger: 0.4, search: 4, lost: 1.2 };
 const lunge = { speed: 140, reach: 14, radius: 10, knockback: 160, damage: 15 };
 
 export const BREEDS: Record<DogKind, Breed> = {

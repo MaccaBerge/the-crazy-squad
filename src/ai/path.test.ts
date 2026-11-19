@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
-import { clearLine, findPath } from './path';
+import type { SolidAt } from '../collision/cornerAssist';
+import { clearLine, findPath, lineOfSight } from './path';
 
 // A 7×5 room with a wall down the middle and a gap at the bottom:
 const MAP = [
@@ -36,4 +37,10 @@ test('a straight line is clear in the open and blocked by the wall', () => {
   const body = { w: 12, h: 6 };
   expect(clearLine(solid, { x: 24, y: 60 }, { x: 88, y: 60 }, body)).toBe(true); // along the gap row
   expect(clearLine(solid, { x: 24, y: 28 }, { x: 88, y: 28 }, body)).toBe(false); // through the wall
+});
+
+test('sight is blocked by a solid tile between, not by open ground', () => {
+  const wall: SolidAt = (x, y) => x === 2 && y === 0; // one wall tile at x 32–48, y 0–16
+  expect(lineOfSight(wall, { x: 8, y: 8 }, { x: 72, y: 8 })).toBe(false);
+  expect(lineOfSight(wall, { x: 8, y: 24 }, { x: 72, y: 24 })).toBe(true);
 });

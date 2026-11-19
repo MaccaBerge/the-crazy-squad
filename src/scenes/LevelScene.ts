@@ -28,6 +28,7 @@ import { DogAI } from '../dogs/dogAI';
 import type { Vec } from '../movement';
 import { inArc, type Swing, swingPhase } from '../combat/swing';
 import { ringSlots, separation } from '../ai/separation';
+import { HUNTING } from '../ai/dogBrain';
 
 const MAP = new URLSearchParams(location.search).get('map') ?? 'test'; // dev: ?map=backyard
 // Dev: ?grass=20000 covers the map in that many blades, with an fps readout (nature blueprint §8, step 2).
@@ -85,6 +86,7 @@ export class LevelScene extends Phaser.Scene {
   private brains: DogAI[] = [];
   private pack: Phaser.GameObjects.GameObject[] = []; // thinking dogs' sprites; colliders read this array live, so spawned dogs just join it
   private nav?: SolidAt;
+  private sight?: SolidAt;
   private spawned = 0;
   private hurt = 0;
   private swing?: { def: Swing; t: number; hit: Set<DogAI> };
@@ -115,7 +117,9 @@ export class LevelScene extends Phaser.Scene {
     this.hurt = 0;
     this.swing = undefined;
     this.frozenUntil = 0;
-    const { map, colliders } = loadMap(this, MAP);
+    const { map, layers, colliders } = loadMap(this, MAP);
+    // Dogs can't see through walls. shortcut: tree trunks don't block sight yet; add them if hiding behind trees should work.
+    this.sight = (tx, ty) => !!layers.Walls?.getTileAt(tx, ty)?.collides;
     const weather = (map.properties as { name: string; value: unknown }[]).find((p) => p.name === 'weather')?.value;
     Object.assign(tuning, WEATHER[isWeather(weather) ? weather : DEFAULT_WEATHER]);
     this.solid = (tx, ty) => colliders.some((l) => l.getTileAt(tx, ty)?.collides);
@@ -162,7 +166,7 @@ export class LevelScene extends Phaser.Scene {
     this.physics.add.collider(this.pack, blockers);
     this.physics.add.collider(this.pack, this.pack); // dogs bump into each other: nobody gets pushed, the overlap is split
     const nav = (this.nav = this.navGrid(map.width, map.height, [...this.trees.bodies, ...this.dogs.sprites.map((d) => d.body as Phaser.Physics.Arcade.Body)]));
-    for (const d of this.brains) d.nav = nav;
+    for (const d of this.brains) Object.assign(d, { nav, sight: this.sight });
     this.leaves = new FallingLeaves(this, this.trees.sources);
     this.hanging = new Hanging(this, map.getObjectLayer('Hanging')?.objects ?? []);
     this.look = new WeatherLook(this, tuning.light);
@@ -219,16 +223,16 @@ export class LevelScene extends Phaser.Scene {
     const pack = this.brains.filter((d) => !d.out), feet = pack.map((d) => d.sprite);
     // Every dog that's after you gets its own spot round you. The closest ones that fit (packSpace apart) take the inner
     // ring, within biting reach; the rest wait in an outer ring and step in as spots free up (dog AI blueprint §5).
-    const hunters = pack.filter((d) => d.state !== 'idle').sort((a, b) => Phaser.Math.Distance.BetweenPoints(a.sprite, s) - Phaser.Math.Distance.BetweenPoints(b.sprite, s));
+    const hunters = pack.filter((d) => HUNTING.has(d.state)).sort((a, b) => Phaser.Math.Distance.BetweenPoints(a.sprite, s) - Phaser.Math.Distance.BetweenPoints(b.sprite, s));
     const fit = Math.max(1, Math.floor((Math.PI * 2 * tuning.packRing) / tuning.packSpace));
     const slots = new Map<DogAI, Vec>();
     for (const [ring, group] of [[tuning.packRing, hunters.slice(0, fit)], [tuning.packRing + tuning.packSpace, hunters.slice(fit)]] as const)
       ringSlots(s, group.map((d) => d.sprite), ring).forEach((p, i) => slots.set(group[i], p));
     // The nav grid also counts off-map tiles, trunks and standing dogs as blocked: a spot there would send a dog searching for nowhere.
     const open = (p?: Vec) => (p && this.nav && !this.nav(toTile(p.x), toTile(p.y - 3)) ? p : undefined);
-    // Dogs that are after you and still close enough to track you warn every packmate within warnRange, so the whole gang
-    // comes, not only the ones with you in sight. Each warned dog that gets close enough passes it on in turn.
-    const trackers = hunters.filter((d) => Phaser.Math.Distance.BetweenPoints(d.sprite, s) <= d.lose).map((d) => d.sprite);
+    // Dogs that can see you warn every packmate within warnRange, so the whole gang comes, not only the ones with you in
+    // sight. A warned dog passes it on only once it sees you itself, so the news never spreads further than the eyes.
+    const trackers = pack.filter((d) => d.seesTarget).map((d) => d.sprite);
     const told = (d: DogAI) => trackers.some((o) => o !== d.sprite && Phaser.Math.Distance.BetweenPoints(o, d.sprite) <= tuning.warnRange);
     pack.forEach((d, i) => d.step(dt, s, tuning, (push, damage) => this.hit(push, damage), { crowd: separation(feet, i, tuning.packSpace), slot: open(slots.get(d)), told: told(d) }));
     for (const d of this.brains) if (d.out) d.step(dt, s, tuning, () => {}); // knocked out: only its timers run
@@ -300,7 +304,7 @@ export class LevelScene extends Phaser.Scene {
       .find((p) => bounds.contains(p.x, p.y) && rectFree({ x: p.x - 6, y: p.y - 6, w: 12, h: 6 }, this.solid));
     if (!at) return this.flash(s, 0xff4040); // boxed in: nowhere to put one
     const d = new DogAI(this, kind, breed, at.x, at.y);
-    d.nav = this.nav;
+    Object.assign(d, { nav: this.nav, sight: this.sight });
     this.pack.push(d.sprite);
     this.brains.push(d);
   }
