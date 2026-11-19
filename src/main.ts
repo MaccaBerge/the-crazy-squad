@@ -39,6 +39,7 @@ const { panel, sync } = tuningPanel(tuning, {
   packSpace: [0, 60, 1],
   packPush: [0, 5, 0.1],
   packRing: [0, 40, 1],
+  warnRange: [0, 400, 10],
   swapSafe: [0, 1, 0.05],
   sprintSpeed: [20, 300, 5],
   drainTime: [0.5, 10, 0.25],

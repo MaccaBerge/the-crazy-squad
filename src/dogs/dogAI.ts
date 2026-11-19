@@ -64,6 +64,11 @@ export class DogAI {
     return this.brain.state;
   }
 
+  /** How far away it keeps tracking a target once it's after it. */
+  get lose() {
+    return this.breed.brain.lose;
+  }
+
   /** Out of the fight: no hits, no attacks, no collisions. */
   get out() {
     return this.ko >= 0;
@@ -90,17 +95,18 @@ export class DogAI {
 
   /**
    * Fixed physics step: think, then move. `onHit` fires once per attack that reaches the target, with the push and damage.
-   * `crowd` is the push away from packmates (separation), mixed into its steering.
-   * `slot` is its own spot in the ring round the target: it chases that instead of the target itself, so a pack surrounds you.
+   * What the pack gives it: `crowd` is the push away from packmates (separation), mixed into its steering. `slot` is its
+   * own spot in the ring round the target, chased instead of the target itself so a pack surrounds you. `told` means a
+   * packmate tracking the target warned it, so it hunts even out of sight.
    */
-  step(dt: number, target: { x: number; y: number } | undefined, t: DogTuning, onHit: (push: Vec, damage: number) => void, crowd: Vec = { x: 0, y: 0 }, slot?: Vec) {
+  step(dt: number, target: { x: number; y: number } | undefined, t: DogTuning, onHit: (push: Vec, damage: number) => void, { crowd = { x: 0, y: 0 }, slot, told = false }: { crowd?: Vec; slot?: Vec; told?: boolean } = {}) {
     const s = this.sprite, b = this.breed;
     this.health.tick(dt);
     this.flashT = Math.max(0, this.flashT - dt);
     if (this.out) return void (this.ko += dt);
     const to = target && { x: target.x - s.x, y: target.y - s.y };
     const dist = to ? Math.hypot(to.x, to.y) : null;
-    const entered = think(this.brain, b.brain, dist, dt);
+    const entered = think(this.brain, b.brain, dist, dt, told);
     const state = this.brain.state;
 
     if (to && dist && (entered === 'windup' || entered === 'alert')) this.aim = { x: to.x / dist, y: to.y / dist }; // aim locks at windup: you can sidestep it

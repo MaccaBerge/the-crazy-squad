@@ -53,3 +53,11 @@ test('a hard hit cancels a windup; any hit wakes a sleeping dog', () => {
   hurt(idle, false);
   expect(idle.state).toBe('chase');
 });
+
+test('a dog warned by a packmate joins the hunt out of sight, and gives up once the warning stops', () => {
+  const b = newBrain();
+  for (let i = 0; i < 60; i++) think(b, def, 400, 1 / 60, true);
+  expect(b.state).toBe('chase');
+  think(b, def, 400, 1 / 60, false);
+  expect(b.state).toBe('idle');
+});

@@ -45,6 +45,7 @@ export const tuning = {
   iframes: 0.8, swapSafe: 0.3, // s: can't be hit again after a hit / right after swapping in
   hitstop: 50, heavyHitstop: 80, // ms the world freezes when a hit lands (combat blueprint §5)
   packSpace: 22, packPush: 1.5, // px dogs keep between them, and how hard they steer apart
+  warnRange: 160, // px a dog that's after you warns packmates across, even ones that can't see you
   packRing: 18, // px from you to each hunting dog's spot in the ring (inside their reach, so they can still bite)
   ...WEATHER[DEFAULT_WEATHER], // replaced by the map's weather on load
 };
@@ -216,7 +217,11 @@ export class LevelScene extends Phaser.Scene {
     for (const [ring, group] of [[tuning.packRing, hunters.slice(0, fit)], [tuning.packRing + tuning.packSpace, hunters.slice(fit)]] as const)
       ringSlots(s, group.map((d) => d.sprite), ring).forEach((p, i) => slots.set(group[i], p));
     const open = (p?: Vec) => (p && !this.solid(toTile(p.x), toTile(p.y - 3)) ? p : undefined);
-    pack.forEach((d, i) => d.step(dt, s, tuning, (push, damage) => this.hit(push, damage), separation(feet, i, tuning.packSpace), open(slots.get(d))));
+    // Dogs that are after you and still close enough to track you warn every packmate within warnRange, so the whole gang
+    // comes, not only the ones with you in sight. Each warned dog that gets close enough passes it on in turn.
+    const trackers = hunters.filter((d) => Phaser.Math.Distance.BetweenPoints(d.sprite, s) <= d.lose).map((d) => d.sprite);
+    const told = (d: DogAI) => trackers.some((o) => o !== d.sprite && Phaser.Math.Distance.BetweenPoints(o, d.sprite) <= tuning.warnRange);
+    pack.forEach((d, i) => d.step(dt, s, tuning, (push, damage) => this.hit(push, damage), { crowd: separation(feet, i, tuning.packSpace), slot: open(slots.get(d)), told: told(d) }));
     for (const d of this.brains) if (d.out) d.step(dt, s, tuning, () => {}); // knocked out: only its timers run
     if (!this.active.active) return; // squad wiped, restarting
     this.attack(intent.pressed.has('attack'), dt);

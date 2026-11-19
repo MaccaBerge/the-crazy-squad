@@ -31,20 +31,22 @@ export function hurt(b: Brain, staggered: boolean) {
 
 /**
  * Advances the brain by dt. `dist` is the distance to the target, or null when there is none.
+ * `told`: a packmate that can see the target is close and warned this dog (dog AI blueprint §2), so it joins the
+ * hunt even when it can't see the target itself, and doesn't give up while the warning lasts.
  * Returns the state it entered this step, if it changed, so the caller can start effects once.
  */
-export function think(b: Brain, def: BrainDef, dist: number | null, dt: number): DogState | undefined {
+export function think(b: Brain, def: BrainDef, dist: number | null, dt: number, told = false): DogState | undefined {
   b.t += dt;
-  const next = decide(b, def, dist);
+  const next = decide(b, def, dist, told);
   if (next === b.state) return;
   b.state = next;
   b.t = 0;
   return next;
 }
 
-function decide({ state, t }: Brain, def: BrainDef, dist: number | null): DogState {
-  const sees = dist !== null && dist <= def.sight;
-  const lost = dist === null || dist > def.lose;
+function decide({ state, t }: Brain, def: BrainDef, dist: number | null, told: boolean): DogState {
+  const sees = (dist !== null && dist <= def.sight) || told;
+  const lost = (dist === null || dist > def.lose) && !told;
   switch (state) {
     case 'idle':
       return sees ? 'alert' : 'idle';
