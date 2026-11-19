@@ -105,6 +105,7 @@ Tile behaviour is set **per tile in the tileset** (Tiled's tileset editor → ti
 | `collides` | bool | Blocks walking. Used on `Walls` tiles: `layer.setCollisionByProperty({ collides: true })`. |
 | `terrain` | `Terrain` enum | What the ground is: `ground`, `shallowWater`, `deepWater`, `ice`, `pit`, `lava`… |
 | `blocksShots` | bool (default = `collides`) | For low walls or water you can shoot across but not walk through |
+| `blocksSight` | bool (default = `collides` on the `Walls` layer, otherwise false) | Dogs can't see through it. Set false on a low fence dogs should see over, true on a tall hedge on another layer |
 
 For odd shapes like a round rock or a diagonal wall, draw the shape with Tiled's **collision editor** and use `setCollisionFromCollisionGroup()`. Use this sparingly, because full-tile collision is simpler and more predictable.
 

@@ -19,19 +19,23 @@ import { WeatherLook } from '../nature/weatherLook';
 import { FallingLeaves } from '../nature/leaves';
 import { preloadTrees, Trees } from '../nature/trees';
 import { gust, windAt } from '../nature/wind';
-import { DEPTH, TILE } from '../world/constants';
+import { DEPTH, TILE, TILE_LAYERS } from '../world/constants';
 import { loadMap, preloadMap } from '../world/loadMap';
 import { spawnEntities } from '../world/spawner';
-import { Dogs, isDogKind, preloadDogs } from '../dogs/dogs';
+import { DOG_KINDS, Dogs, isDogKind, preloadDogs } from '../dogs/dogs';
 import { BREEDS } from '../dogs/breeds';
 import { DogAI } from '../dogs/dogAI';
 import type { Vec } from '../movement';
+import { inArc, type Swing, swingPhase } from '../combat/swing';
+import { ringSlots, separation } from '../ai/separation';
+import { HUNTING } from '../ai/dogBrain';
 
 const MAP = new URLSearchParams(location.search).get('map') ?? 'test'; // dev: ?map=backyard
 // Dev: ?grass=20000 covers the map in that many blades, with an fps readout (nature blueprint §8, step 2).
 const STRESS_BLADES = Number(new URLSearchParams(location.search).get('grass')) || 0;
 const NUDGE_SPEED = 0.6; // corner assist sideways speed, as a share of top speed
 const HURT = 0.18; // seconds a hit pushes you around before your input counts again
+const ATTACK_SLOW = 0.4; // share of walking speed while swinging: you can creep, not run (combat blueprint §3)
 
 /** Live-tunable values (T panel). Character stats multiply the movement values. */
 // Walking is the default; holding sprint raises speed to sprintSpeed while stamina lasts.
@@ -40,6 +44,10 @@ export const tuning = {
   walkSpeed: 62, sprintSpeed: 115, accel: defaultMove.accel, decel: defaultMove.decel, ...defaultStamina,
   cameraLerp: 0.15, lookahead: 24, swapCooldown: 4, animSpeed: 1,
   iframes: 0.8, swapSafe: 0.3, // s: can't be hit again after a hit / right after swapping in
+  hitstop: 50, heavyHitstop: 80, // ms the world freezes when a hit lands (combat blueprint §5)
+  packSpace: 22, packPush: 1.5, // px dogs keep between them, and how hard they steer apart
+  warnRange: 160, // px a dog that's after you warns packmates across, even ones that can't see you
+  packRing: 18, // px from you to each hunting dog's spot in the ring (inside their reach, so they can still bite)
   ...WEATHER[DEFAULT_WEATHER], // replaced by the map's weather on load
 };
 
@@ -76,7 +84,14 @@ export class LevelScene extends Phaser.Scene {
   private look!: WeatherLook;
   private dogs!: Dogs;
   private brains: DogAI[] = [];
+  private pack: Phaser.GameObjects.GameObject[] = []; // thinking dogs' sprites; colliders read this array live, so spawned dogs just join it
+  private nav?: SolidAt;
+  private sight?: SolidAt;
+  private spawned = 0;
   private hurt = 0;
+  private swing?: { def: Swing; t: number; hit: Set<DogAI> };
+  private swingFx!: Phaser.GameObjects.Graphics;
+  private frozenUntil = 0;
   private knock: Vec = { x: 0, y: 0 };
   private readout?: HTMLDivElement;
 
@@ -100,7 +115,9 @@ export class LevelScene extends Phaser.Scene {
     this.party = new Party(SQUAD, tuning);
     this.brains = [];
     this.hurt = 0;
-    const { map, colliders } = loadMap(this, MAP);
+    this.swing = undefined;
+    this.frozenUntil = 0;
+    const { map, layers, colliders } = loadMap(this, MAP);
     const weather = (map.properties as { name: string; value: unknown }[]).find((p) => p.name === 'weather')?.value;
     Object.assign(tuning, WEATHER[isWeather(weather) ? weather : DEFAULT_WEATHER]);
     this.solid = (tx, ty) => colliders.some((l) => l.getTileAt(tx, ty)?.collides);
@@ -123,8 +140,7 @@ export class LevelScene extends Phaser.Scene {
       PlayerSpawn: (o) => (spawn = { x: o.x ?? spawn.x, y: o.y ?? spawn.y }),
       Dog: (o, p) => {
         if (!isDogKind(p.kind)) return console.warn(`Dog ${o.id}: unknown kind "${p.kind}"`);
-        const breed = BREEDS[p.kind];
-        if (p.ai === true && breed) this.brains.push(new DogAI(this, p.kind, breed, o.x ?? 0, o.y ?? 0));
+        if (p.ai === true) this.brains.push(new DogAI(this, p.kind, BREEDS[p.kind], o.x ?? 0, o.y ?? 0));
         else this.dogs.add(p.kind, o.x ?? 0, o.y ?? 0, typeof p.anim === 'string' ? { anim: p.anim, dir: String(p.dir ?? 'south') } : undefined);
       },
     });
@@ -141,16 +157,28 @@ export class LevelScene extends Phaser.Scene {
     });
     onStage(this.active, spawn.x, spawn.y);
     this.trees = new Trees(this, map.getObjectLayer('Trees')?.objects ?? []);
-    const thinking = this.brains.map((d) => d.sprite);
-    this.physics.add.collider(this.sprites, [...colliders, ...this.trees.bodies, ...this.dogs.sprites, ...thinking]);
-    this.physics.add.collider(thinking, [...colliders, ...this.trees.bodies, ...this.dogs.sprites]);
-    const nav = this.navGrid(map.width, map.height, [...this.trees.bodies, ...this.dogs.sprites.map((d) => d.body as Phaser.Physics.Arcade.Body)]);
-    for (const d of this.brains) d.nav = nav;
+    this.pack = this.brains.map((d) => d.sprite);
+    const blockers = [...colliders, ...this.trees.bodies, ...this.dogs.sprites];
+    this.physics.add.collider(this.sprites, [...blockers]);
+    this.physics.add.collider(this.sprites, this.pack);
+    this.physics.add.collider(this.pack, blockers);
+    this.physics.add.collider(this.pack, this.pack); // dogs bump into each other: nobody gets pushed, the overlap is split
+    // What dogs can't see through: tiles with blocksSight (default: colliding Walls tiles, see the world blueprint) and
+    // trees whose type has blocksSight.
+    const tileBlocksSight: SolidAt = (tx, ty) => TILE_LAYERS.some((name) => {
+      const tile = layers[name]?.getTileAt(tx, ty);
+      const own = (tile?.properties as { blocksSight?: boolean } | undefined)?.blocksSight;
+      return !!tile && (own ?? (name === 'Walls' && tile.collides));
+    });
+    this.sight = this.navGrid(map.width, map.height, this.trees.sightBlocks, tileBlocksSight);
+    const nav = (this.nav = this.navGrid(map.width, map.height, [...this.trees.bodies, ...this.dogs.sprites.map((d) => d.body as Phaser.Physics.Arcade.Body)]));
+    for (const d of this.brains) Object.assign(d, { nav, sight: this.sight });
     this.leaves = new FallingLeaves(this, this.trees.sources);
     this.hanging = new Hanging(this, map.getObjectLayer('Hanging')?.objects ?? []);
     this.look = new WeatherLook(this, tuning.light);
     this.facingDot = this.add.image(0, 0, 'dot');
     this.staminaBar = this.add.graphics().setDepth(DEPTH.effects);
+    this.swingFx = this.add.graphics().setDepth(DEPTH.effects);
 
     this.rig = new CameraRig(this.cameras.main, tuning);
     this.rig.follow(this.active);
@@ -166,6 +194,17 @@ export class LevelScene extends Phaser.Scene {
       if (world.drawDebug && !world.debugGraphic) world.createDebugGraphic();
       if (!world.drawDebug) world.debugGraphic?.clear();
     });
+
+    // Dev: the mouse wheel or -/+ zooms the view out and in, 0 resets. For testing only: below 1× the pixels shimmer.
+    const cam = this.cameras.main;
+    const zoomTo = (z: number) => cam.setZoom(Phaser.Math.Clamp(z, 0.25, 3));
+    this.input.on('wheel', (_p: unknown, _o: unknown, _dx: number, dy: number) => zoomTo(cam.zoom * Math.exp(-dy * 0.002))); // smooth on trackpads too
+    this.input.keyboard!.on('keydown-MINUS', () => zoomTo(cam.zoom / 1.25));
+    this.input.keyboard!.on('keydown-PLUS', () => zoomTo(cam.zoom * 1.25));
+    this.input.keyboard!.on('keydown-ZERO', () => zoomTo(1));
+
+    // Dev: N drops a fighting dog near you, cycling through the breeds.
+    this.input.keyboard!.on('keydown-N', (e: KeyboardEvent) => !e.repeat && this.spawnDog()); // holding N spawns one, not a stream
 
     // Dev: V shows the wind as arrows, one per tile (nature blueprint §8, step 1).
     this.windView = this.add.graphics().setDepth(DEPTH.effects).setVisible(false);
@@ -187,15 +226,32 @@ export class LevelScene extends Phaser.Scene {
     if (swap) this.trySwap(swap);
 
     const s = this.active;
-    for (const d of this.brains) d.step(dt, s, tuning, (push, damage) => this.hit(push, damage));
+    const pack = this.brains.filter((d) => !d.out), feet = pack.map((d) => d.sprite);
+    // Every dog that's after you gets its own spot round you. The closest ones that fit (packSpace apart) take the inner
+    // ring, within biting reach; the rest wait in an outer ring and step in as spots free up (dog AI blueprint §5).
+    const hunters = pack.filter((d) => HUNTING.has(d.state)).sort((a, b) => Phaser.Math.Distance.BetweenPoints(a.sprite, s) - Phaser.Math.Distance.BetweenPoints(b.sprite, s));
+    const fit = Math.max(1, Math.floor((Math.PI * 2 * tuning.packRing) / tuning.packSpace));
+    const slots = new Map<DogAI, Vec>();
+    for (const [ring, group] of [[tuning.packRing, hunters.slice(0, fit)], [tuning.packRing + tuning.packSpace, hunters.slice(fit)]] as const)
+      ringSlots(s, group.map((d) => d.sprite), ring).forEach((p, i) => slots.set(group[i], p));
+    // The nav grid also counts off-map tiles, trunks and standing dogs as blocked: a spot there would send a dog searching for nowhere.
+    const open = (p?: Vec) => (p && this.nav && !this.nav(toTile(p.x), toTile(p.y - 3)) ? p : undefined);
+    // Dogs that can see you warn every packmate within warnRange, so the whole gang comes, not only the ones with you in
+    // sight. A warned dog passes it on only once it sees you itself, so the news never spreads further than the eyes.
+    const trackers = pack.filter((d) => d.seesTarget).map((d) => d.sprite);
+    const told = (d: DogAI) => trackers.some((o) => o !== d.sprite && Phaser.Math.Distance.BetweenPoints(o, d.sprite) <= tuning.warnRange);
+    pack.forEach((d, i) => d.step(dt, s, tuning, (push, damage) => this.hit(push, damage), { crowd: separation(feet, i, tuning.packSpace), slot: open(slots.get(d)), told: told(d) }));
+    for (const d of this.brains) if (d.out) d.step(dt, s, tuning, () => {}); // knocked out: only its timers run
     if (!this.active.active) return; // squad wiped, restarting
+    this.attack(intent.pressed.has('attack'), dt);
     if (this.hurt > 0) {
       // Knocked back: the push fades out and your input waits, so the hit reads.
       this.hurt = Math.max(0, this.hurt - dt);
       s.body.setVelocity(this.knock.x * (this.hurt / HURT), this.knock.y * (this.hurt / HURT));
       return;
     }
-    const p = this.moveParams(this.party.active, this.sprinting);
+    const p = this.moveParams(this.party.active, this.sprinting && !this.swing);
+    if (this.swing) p.maxSpeed *= ATTACK_SLOW;
     // Exhausted (bar just ran dry): walk slower. Animation speed still compares to the normal walk, so the legs look heavy.
     p.maxSpeed *= this.party.stamina[this.party.activeIndex].speedFactor;
     const v = stepVelocity(s.body.velocity, intent.move, dt, p);
@@ -205,11 +261,58 @@ export class LevelScene extends Phaser.Scene {
     if (nudge?.y) v.y = nudge.y * p.maxSpeed * NUDGE_SPEED;
     b.setVelocity(v.x, v.y);
 
+    if (this.swing) return; // facing is locked from windup to the end of recovery, so a swing can't turn mid-arc
     if (intent.move.x || intent.move.y) {
       const len = Math.hypot(intent.move.x, intent.move.y);
       this.facing = { x: intent.move.x / len, y: intent.move.y / len };
     }
     this.dir = snapDir(this.dir, intent.move);
+  }
+
+  /** The active character's basic attack (combat blueprint §3): start it on a press, hit dogs in the arc while it's active. */
+  private attack(pressed: boolean, dt: number) {
+    const def = this.party.active.attack;
+    if (pressed && !this.swing && this.hurt <= 0) {
+      this.controller.consume('attack'); // while swinging the press stays buffered, so mashing chains swings
+      if (def) this.swing = { def, t: 0, hit: new Set() };
+    }
+    const sw = this.swing;
+    if (!sw) return;
+    sw.t += dt;
+    const phase = swingPhase(sw.def, sw.t);
+    if (phase === 'done') return void (this.swing = undefined);
+    if (phase !== 'active') return;
+    const s = this.active, f = this.facing;
+    for (const d of this.brains) {
+      if (d.out || sw.hit.has(d) || !inArc(sw.def, s, f, d.sprite)) continue;
+      sw.hit.add(d);
+      if (d.takeHit(sw.def.damage, { x: f.x * sw.def.knockback, y: f.y * sw.def.knockback })) this.freeze(sw.def.heavy ? tuning.heavyHitstop : tuning.hitstop);
+    }
+  }
+
+  /**
+   * Hit freeze: a few ms where nothing moves, so a hit lands with weight.
+   * shortcut: pauses the whole physics world, not only the two involved; fine while fights are small.
+   */
+  private freeze(ms: number) {
+    const world = this.physics.world;
+    this.frozenUntil = Math.max(this.frozenUntil, this.time.now + ms);
+    world.pause();
+    this.time.delayedCall(ms, () => this.time.now >= this.frozenUntil - 1 && world.resume());
+  }
+
+  /** Dev spawn: the next breed, on the first free spot about 4 tiles from you. */
+  private spawnDog() {
+    const kind = DOG_KINDS[this.spawned++ % DOG_KINDS.length], breed = BREEDS[kind];
+    const s = this.active, bounds = this.physics.world.bounds;
+    // Each spawn starts the search one step further round, so several dogs don't land in a pile.
+    const at = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => (i + this.spawned * 3) * Math.PI / 4).map((a) => ({ x: s.x + Math.cos(a) * 64, y: s.y + Math.sin(a) * 64 }))
+      .find((p) => bounds.contains(p.x, p.y) && rectFree({ x: p.x - 6, y: p.y - 6, w: 12, h: 6 }, this.solid));
+    if (!at) return this.flash(s, 0xff4040); // boxed in: nowhere to put one
+    const d = new DogAI(this, kind, breed, at.x, at.y);
+    Object.assign(d, { nav: this.nav, sight: this.sight });
+    this.pack.push(d.sprite);
+    this.brains.push(d);
   }
 
   private trySwap(action: SwapAction) {
@@ -222,12 +325,13 @@ export class LevelScene extends Phaser.Scene {
   }
 
   /**
-   * Tiles dogs path around: solid tiles plus any tile a trunk or standing dog's body touches.
+   * A tile grid of `base` tiles plus any tile one of `bodies` touches: what dogs path around (trunks, standing dogs) or
+   * can't see through (sight blockers).
    * shortcut: built once, so it doesn't know about things that move or appear later; rebuild it when they exist.
    */
-  private navGrid(w: number, h: number, bodies: { x: number; y: number; width: number; height: number }[]): SolidAt {
+  private navGrid(w: number, h: number, bodies: { x: number; y: number; width: number; height: number }[], base: SolidAt = this.solid): SolidAt {
     const blocked = new Uint8Array(w * h);
-    for (let ty = 0; ty < h; ty++) for (let tx = 0; tx < w; tx++) blocked[ty * w + tx] = this.solid(tx, ty) ? 1 : 0;
+    for (let ty = 0; ty < h; ty++) for (let tx = 0; tx < w; tx++) blocked[ty * w + tx] = base(tx, ty) ? 1 : 0;
     for (const b of bodies)
       for (let ty = toTile(b.y); ty <= toTile(b.y + b.height - 0.001); ty++)
         for (let tx = toTile(b.x); tx <= toTile(b.x + b.width - 0.001); tx++) if (tx >= 0 && ty >= 0 && tx < w && ty < h) blocked[ty * w + tx] = 1;
@@ -238,6 +342,7 @@ export class LevelScene extends Phaser.Scene {
   private swapIn(from: CharSprite) {
     const to = this.active;
     const { x: vx, y: vy } = from.body.velocity;
+    this.swing = undefined; // swapping cancels whatever the old one was doing
     offStage(from);
     onStage(to, from.x, from.y);
     to.body.setVelocity(vx, vy);
@@ -256,6 +361,8 @@ export class LevelScene extends Phaser.Scene {
   private hit(push: Vec, damage: number) {
     const i = this.party.activeIndex, health = this.party.health[i];
     if (!health.take(damage, tuning.iframes)) return; // invincible: no push either
+    this.freeze(tuning.hitstop);
+    this.swing = undefined; // a hit interrupts your attack
     this.hurt = HURT;
     this.knock = push;
     this.flash(this.active, 0xb4443a);
@@ -299,6 +406,7 @@ export class LevelScene extends Phaser.Scene {
     }
     this.rig.update(s.body.velocity, this.moveParams(this.party.active, this.sprinting).maxSpeed, delta / 1000);
     this.drawStamina(s, delta / 1000);
+    this.drawSwing(s);
     if (this.windView.visible) this.drawWind();
     this.trees.update(this.time.now / 1000, delta / 1000, tuning, s);
     this.leaves.update(this.time.now / 1000, Math.min(delta / 1000, 0.05), tuning);
@@ -314,6 +422,17 @@ export class LevelScene extends Phaser.Scene {
       if (this.readout && this.game.getFrame() % 30 === 0)
         this.readout.textContent = `${STRESS_BLADES} blades · ${this.grass.pushed} pushed · ${changed} re-posed in ${ms.toFixed(2)} ms · ${this.game.loop.actualFps.toFixed(0)} fps`;
     }
+  }
+
+  /** Placeholder for the wrench: a pale arc sweeping across the front during the active part, fading in recovery. */
+  private drawSwing(s: CharSprite) {
+    const g = this.swingFx.clear(), sw = this.swing;
+    if (!sw) return;
+    const d = sw.def, into = sw.t - d.windup;
+    if (into < 0) return;
+    const half = ((d.arc / 2) * Math.PI) / 180, a = Math.atan2(this.facing.y, this.facing.x);
+    const sweep = Math.min(1, into / d.active), fade = into <= d.active ? 1 : 1 - (into - d.active) / d.recovery;
+    g.lineStyle(2, 0xe6faf6, 0.9 * fade).beginPath().arc(s.x, s.y - 6, d.radius - 6, a - half, a - half + 2 * half * sweep).strokePath();
   }
 
   /** One arrow per tile in view, pointing where the wind blows there: length is its strength, orange where a gust is passing. */
