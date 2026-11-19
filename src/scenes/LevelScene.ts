@@ -134,8 +134,7 @@ export class LevelScene extends Phaser.Scene {
       PlayerSpawn: (o) => (spawn = { x: o.x ?? spawn.x, y: o.y ?? spawn.y }),
       Dog: (o, p) => {
         if (!isDogKind(p.kind)) return console.warn(`Dog ${o.id}: unknown kind "${p.kind}"`);
-        const breed = BREEDS[p.kind];
-        if (p.ai === true && breed) this.brains.push(new DogAI(this, p.kind, breed, o.x ?? 0, o.y ?? 0));
+        if (p.ai === true) this.brains.push(new DogAI(this, p.kind, BREEDS[p.kind], o.x ?? 0, o.y ?? 0));
         else this.dogs.add(p.kind, o.x ?? 0, o.y ?? 0, typeof p.anim === 'string' ? { anim: p.anim, dir: String(p.dir ?? 'south') } : undefined);
       },
     });
@@ -180,7 +179,7 @@ export class LevelScene extends Phaser.Scene {
       if (!world.drawDebug) world.debugGraphic?.clear();
     });
 
-    // Dev: N drops a fighting dog near you, cycling through every breed that has a brain.
+    // Dev: N drops a fighting dog near you, cycling through the breeds.
     this.input.keyboard!.on('keydown-N', () => this.spawnDog());
 
     // Dev: V shows the wind as arrows, one per tile (nature blueprint §8, step 1).
@@ -263,10 +262,9 @@ export class LevelScene extends Phaser.Scene {
     this.time.delayedCall(ms, () => this.time.now >= this.frozenUntil - 1 && world.resume());
   }
 
-  /** Dev spawn: the next breed with a brain, on the first free spot about 4 tiles from you. */
+  /** Dev spawn: the next breed, on the first free spot about 4 tiles from you. */
   private spawnDog() {
-    const kinds = DOG_KINDS.filter((k) => BREEDS[k]);
-    const kind = kinds[this.spawned++ % kinds.length], breed = BREEDS[kind]!;
+    const kind = DOG_KINDS[this.spawned++ % DOG_KINDS.length], breed = BREEDS[kind];
     const s = this.active, bounds = this.physics.world.bounds;
     // Each spawn starts the search one step further round, so several dogs don't land in a pile.
     const at = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => (i + this.spawned * 3) * Math.PI / 4).map((a) => ({ x: s.x + Math.cos(a) * 64, y: s.y + Math.sin(a) * 64 }))
