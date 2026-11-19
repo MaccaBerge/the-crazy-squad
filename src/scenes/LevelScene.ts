@@ -210,7 +210,9 @@ export class LevelScene extends Phaser.Scene {
     const pack = this.brains.filter((d) => !d.out), feet = pack.map((d) => d.sprite);
     // Every dog that's after you gets its own spot round you; a spot inside a wall falls back to you.
     const hunters = pack.filter((d) => d.state !== 'idle');
-    const slots = new Map(ringSlots(s, hunters.map((d) => d.sprite), tuning.packRing).map((p, i) => [hunters[i], p]));
+    // A big gang widens the ring so every dog keeps packSpace; the ones too far out to bite wait their turn there.
+    const ring = Math.max(tuning.packRing, (hunters.length * tuning.packSpace) / (Math.PI * 2));
+    const slots = new Map(ringSlots(s, hunters.map((d) => d.sprite), ring).map((p, i) => [hunters[i], p]));
     const open = (p?: Vec) => (p && !this.solid(toTile(p.x), toTile(p.y - 3)) ? p : undefined);
     pack.forEach((d, i) => d.step(dt, s, tuning, (push, damage) => this.hit(push, damage), separation(feet, i, tuning.packSpace), open(slots.get(d))));
     for (const d of this.brains) if (d.out) d.step(dt, s, tuning, () => {}); // knocked out: only its timers run
