@@ -180,7 +180,7 @@ export class LevelScene extends Phaser.Scene {
     });
 
     // Dev: N drops a fighting dog near you, cycling through the breeds.
-    this.input.keyboard!.on('keydown-N', () => this.spawnDog());
+    this.input.keyboard!.on('keydown-N', (e: KeyboardEvent) => !e.repeat && this.spawnDog()); // holding N spawns one, not a stream
 
     // Dev: V shows the wind as arrows, one per tile (nature blueprint §8, step 1).
     this.windView = this.add.graphics().setDepth(DEPTH.effects).setVisible(false);
