@@ -52,7 +52,8 @@ export class DogAI {
   constructor(private scene: Phaser.Scene, readonly kind: DogKind, private breed: Breed, x: number, y: number) {
     this.sprite = scene.physics.add.sprite(x, y, `dog-${kind}`, 2).setOrigin(0.5, 1) as DogSprite;
     this.sprite.body.setSize(BODY.w, BODY.h, false).setOffset((FRAME - BODY.w) / 2, FRAME - BODY.h);
-    this.sprite.setImmovable(true).setCollideWorldBounds(true).setVertexRoundMode('full'); // the squad can't shove it
+    // Not pushable: the squad can't shove it, and two dogs that bump split the overlap instead of passing through.
+    this.sprite.setPushable(false).setCollideWorldBounds(true).setVertexRoundMode('full');
     this.marks = scene.add.graphics().setDepth(DEPTH.effects);
     this.label = scene.add.text(x, y, '', { fontFamily: 'monospace', fontSize: '8px', color: '#fff', backgroundColor: '#000a', resolution: 4 })
       .setOrigin(0.5, 1).setDepth(DEPTH.ui).setVisible(false);

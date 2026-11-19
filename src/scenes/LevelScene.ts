@@ -81,7 +81,7 @@ export class LevelScene extends Phaser.Scene {
   private look!: WeatherLook;
   private dogs!: Dogs;
   private brains: DogAI[] = [];
-  private blockers: (Phaser.Tilemaps.TilemapLayer | Phaser.GameObjects.GameObject | Phaser.Physics.Arcade.Body | Phaser.Physics.Arcade.StaticBody)[] = []; // what a spawned dog bumps into
+  private pack: Phaser.GameObjects.GameObject[] = []; // thinking dogs' sprites; colliders read this array live, so spawned dogs just join it
   private nav?: SolidAt;
   private spawned = 0;
   private hurt = 0;
@@ -153,10 +153,12 @@ export class LevelScene extends Phaser.Scene {
     });
     onStage(this.active, spawn.x, spawn.y);
     this.trees = new Trees(this, map.getObjectLayer('Trees')?.objects ?? []);
-    const thinking = this.brains.map((d) => d.sprite);
-    this.blockers = [...colliders, ...this.trees.bodies, ...this.dogs.sprites];
-    this.physics.add.collider(this.sprites, [...this.blockers, ...thinking]);
-    this.physics.add.collider(thinking, this.blockers);
+    this.pack = this.brains.map((d) => d.sprite);
+    const blockers = [...colliders, ...this.trees.bodies, ...this.dogs.sprites];
+    this.physics.add.collider(this.sprites, [...blockers]);
+    this.physics.add.collider(this.sprites, this.pack);
+    this.physics.add.collider(this.pack, blockers);
+    this.physics.add.collider(this.pack, this.pack); // dogs bump into each other: nobody gets pushed, the overlap is split
     const nav = (this.nav = this.navGrid(map.width, map.height, [...this.trees.bodies, ...this.dogs.sprites.map((d) => d.body as Phaser.Physics.Arcade.Body)]));
     for (const d of this.brains) d.nav = nav;
     this.leaves = new FallingLeaves(this, this.trees.sources);
@@ -276,8 +278,7 @@ export class LevelScene extends Phaser.Scene {
     if (!at) return this.flash(s, 0xff4040); // boxed in: nowhere to put one
     const d = new DogAI(this, kind, breed, at.x, at.y);
     d.nav = this.nav;
-    this.physics.add.collider(d.sprite, this.blockers);
-    this.physics.add.collider(this.sprites, d.sprite);
+    this.pack.push(d.sprite);
     this.brains.push(d);
   }
 
