@@ -14,7 +14,7 @@ type Body = Phaser.Physics.Arcade.Body;
 type DogSprite = Phaser.Physics.Arcade.Sprite & { body: Body };
 
 /** The shared movement tuning a dog's breed multiplies (the T panel's walk values). */
-export type DogTuning = { walkSpeed: number; accel: number; decel: number };
+export type DogTuning = { walkSpeed: number; accel: number; decel: number; packPush: number };
 
 const BODY = { w: 12, h: 6 }; // feet only, like the squad
 const FRAME = 32;
@@ -83,8 +83,11 @@ export class DogAI {
     return true;
   }
 
-  /** Fixed physics step: think, then move. `onHit` fires once per attack that reaches the target, with the push and damage. */
-  step(dt: number, target: { x: number; y: number } | undefined, t: DogTuning, onHit: (push: Vec, damage: number) => void) {
+  /**
+   * Fixed physics step: think, then move. `onHit` fires once per attack that reaches the target, with the push and damage.
+   * `crowd` is the push away from packmates (separation), mixed into its steering whenever it isn't attacking.
+   */
+  step(dt: number, target: { x: number; y: number } | undefined, t: DogTuning, onHit: (push: Vec, damage: number) => void, crowd: Vec = { x: 0, y: 0 }) {
     const s = this.sprite, b = this.breed;
     this.health.tick(dt);
     this.flashT = Math.max(0, this.flashT - dt);
@@ -103,6 +106,7 @@ export class DogAI {
       const gx = goal.x - s.x, gy = goal.y - s.y, gd = Math.hypot(gx, gy);
       if (gd > 0.5) move = { x: gx / gd, y: gy / gd };
     } else this.path = [];
+    if (state !== 'windup' && state !== 'attack') move = { x: move.x + crowd.x * t.packPush, y: move.y + crowd.y * t.packPush };
     const p = { maxSpeed: t.walkSpeed * b.speed, accel: t.accel * b.accel, decel: t.decel * b.accel };
     const v = this.knockT > 0 ? (this.knockT = Math.max(0, this.knockT - dt), { x: this.knock.x * (this.knockT / KNOCK), y: this.knock.y * (this.knockT / KNOCK) })
       : state === 'attack' ? { x: this.aim.x * b.lunge.speed, y: this.aim.y * b.lunge.speed } : stepVelocity(s.body.velocity, move, dt, p);

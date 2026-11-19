@@ -36,6 +36,8 @@ const { panel, sync } = tuningPanel(tuning, {
   iframes: [0, 2, 0.05],
   hitstop: [0, 200, 5],
   heavyHitstop: [0, 200, 5],
+  packSpace: [0, 60, 1],
+  packPush: [0, 5, 0.1],
   swapSafe: [0, 1, 0.05],
   sprintSpeed: [20, 300, 5],
   drainTime: [0.5, 10, 0.25],
