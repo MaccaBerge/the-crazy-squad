@@ -22,7 +22,7 @@ import { gust, windAt } from '../nature/wind';
 import { DEPTH, TILE } from '../world/constants';
 import { loadMap, preloadMap } from '../world/loadMap';
 import { spawnEntities } from '../world/spawner';
-import { Dogs, isDogKind, preloadDogs } from '../dogs/dogs';
+import { DOG_KINDS, Dogs, isDogKind, preloadDogs } from '../dogs/dogs';
 import { BREEDS } from '../dogs/breeds';
 import { DogAI } from '../dogs/dogAI';
 import type { Vec } from '../movement';
@@ -79,6 +79,9 @@ export class LevelScene extends Phaser.Scene {
   private look!: WeatherLook;
   private dogs!: Dogs;
   private brains: DogAI[] = [];
+  private blockers: (Phaser.Tilemaps.TilemapLayer | Phaser.GameObjects.GameObject | Phaser.Physics.Arcade.Body | Phaser.Physics.Arcade.StaticBody)[] = []; // what a spawned dog bumps into
+  private nav?: SolidAt;
+  private spawned = 0;
   private hurt = 0;
   private swing?: { def: Swing; t: number; hit: Set<DogAI> };
   private swingFx!: Phaser.GameObjects.Graphics;
@@ -150,9 +153,10 @@ export class LevelScene extends Phaser.Scene {
     onStage(this.active, spawn.x, spawn.y);
     this.trees = new Trees(this, map.getObjectLayer('Trees')?.objects ?? []);
     const thinking = this.brains.map((d) => d.sprite);
-    this.physics.add.collider(this.sprites, [...colliders, ...this.trees.bodies, ...this.dogs.sprites, ...thinking]);
-    this.physics.add.collider(thinking, [...colliders, ...this.trees.bodies, ...this.dogs.sprites]);
-    const nav = this.navGrid(map.width, map.height, [...this.trees.bodies, ...this.dogs.sprites.map((d) => d.body as Phaser.Physics.Arcade.Body)]);
+    this.blockers = [...colliders, ...this.trees.bodies, ...this.dogs.sprites];
+    this.physics.add.collider(this.sprites, [...this.blockers, ...thinking]);
+    this.physics.add.collider(thinking, this.blockers);
+    const nav = (this.nav = this.navGrid(map.width, map.height, [...this.trees.bodies, ...this.dogs.sprites.map((d) => d.body as Phaser.Physics.Arcade.Body)]));
     for (const d of this.brains) d.nav = nav;
     this.leaves = new FallingLeaves(this, this.trees.sources);
     this.hanging = new Hanging(this, map.getObjectLayer('Hanging')?.objects ?? []);
@@ -175,6 +179,9 @@ export class LevelScene extends Phaser.Scene {
       if (world.drawDebug && !world.debugGraphic) world.createDebugGraphic();
       if (!world.drawDebug) world.debugGraphic?.clear();
     });
+
+    // Dev: N drops a fighting dog near you, cycling through every breed that has a brain.
+    this.input.keyboard!.on('keydown-N', () => this.spawnDog());
 
     // Dev: V shows the wind as arrows, one per tile (nature blueprint §8, step 1).
     this.windView = this.add.graphics().setDepth(DEPTH.effects).setVisible(false);
@@ -254,6 +261,21 @@ export class LevelScene extends Phaser.Scene {
     this.frozenUntil = Math.max(this.frozenUntil, this.time.now + ms);
     world.pause();
     this.time.delayedCall(ms, () => this.time.now >= this.frozenUntil - 1 && world.resume());
+  }
+
+  /** Dev spawn: the next breed with a brain, on the first free spot about 4 tiles from you. */
+  private spawnDog() {
+    const kinds = DOG_KINDS.filter((k) => BREEDS[k]);
+    const kind = kinds[this.spawned++ % kinds.length], breed = BREEDS[kind]!;
+    const s = this.active, bounds = this.physics.world.bounds;
+    const at = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => ({ x: s.x + Math.cos(i * Math.PI / 4) * 64, y: s.y + Math.sin(i * Math.PI / 4) * 64 }))
+      .find((p) => bounds.contains(p.x, p.y) && rectFree({ x: p.x - 6, y: p.y - 6, w: 12, h: 6 }, this.solid));
+    if (!at) return this.flash(s, 0xff4040); // boxed in: nowhere to put one
+    const d = new DogAI(this, kind, breed, at.x, at.y);
+    d.nav = this.nav;
+    this.physics.add.collider(d.sprite, this.blockers);
+    this.physics.add.collider(this.sprites, d.sprite);
+    this.brains.push(d);
   }
 
   private trySwap(action: SwapAction) {
