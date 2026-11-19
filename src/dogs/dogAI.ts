@@ -85,7 +85,7 @@ export class DogAI {
 
   /**
    * Fixed physics step: think, then move. `onHit` fires once per attack that reaches the target, with the push and damage.
-   * `crowd` is the push away from packmates (separation), mixed into its steering whenever it isn't attacking.
+   * `crowd` is the push away from packmates (separation), mixed into its steering.
    */
   step(dt: number, target: { x: number; y: number } | undefined, t: DogTuning, onHit: (push: Vec, damage: number) => void, crowd: Vec = { x: 0, y: 0 }) {
     const s = this.sprite, b = this.breed;
@@ -106,10 +106,12 @@ export class DogAI {
       const gx = goal.x - s.x, gy = goal.y - s.y, gd = Math.hypot(gx, gy);
       if (gd > 0.5) move = { x: gx / gd, y: gy / gd };
     } else this.path = [];
-    if (state !== 'windup' && state !== 'attack') move = { x: move.x + crowd.x * t.packPush, y: move.y + crowd.y * t.packPush };
+    // Packmates push apart in every state, the lunge too: they all aim at you, so without it they'd land in one spot.
+    const apart = { x: crowd.x * t.packPush, y: crowd.y * t.packPush };
+    move = { x: move.x + apart.x, y: move.y + apart.y };
     const p = { maxSpeed: t.walkSpeed * b.speed, accel: t.accel * b.accel, decel: t.decel * b.accel };
     const v = this.knockT > 0 ? (this.knockT = Math.max(0, this.knockT - dt), { x: this.knock.x * (this.knockT / KNOCK), y: this.knock.y * (this.knockT / KNOCK) })
-      : state === 'attack' ? { x: this.aim.x * b.lunge.speed, y: this.aim.y * b.lunge.speed } : stepVelocity(s.body.velocity, move, dt, p);
+      : state === 'attack' ? { x: this.aim.x * b.lunge.speed + apart.x * p.maxSpeed, y: this.aim.y * b.lunge.speed + apart.y * p.maxSpeed } : stepVelocity(s.body.velocity, move, dt, p);
     s.body.setVelocity(v.x, v.y);
     this.dir = snapDir(this.dir, state === 'chase' ? move : state === 'idle' ? { x: 0, y: 0 } : this.aim);
 
