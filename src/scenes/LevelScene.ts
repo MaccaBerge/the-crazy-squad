@@ -19,7 +19,7 @@ import { WeatherLook } from '../nature/weatherLook';
 import { FallingLeaves } from '../nature/leaves';
 import { preloadTrees, Trees } from '../nature/trees';
 import { gust, windAt } from '../nature/wind';
-import { DEPTH, TILE } from '../world/constants';
+import { DEPTH, TILE, TILE_LAYERS } from '../world/constants';
 import { loadMap, preloadMap } from '../world/loadMap';
 import { spawnEntities } from '../world/spawner';
 import { DOG_KINDS, Dogs, isDogKind, preloadDogs } from '../dogs/dogs';
@@ -118,8 +118,6 @@ export class LevelScene extends Phaser.Scene {
     this.swing = undefined;
     this.frozenUntil = 0;
     const { map, layers, colliders } = loadMap(this, MAP);
-    // Dogs can't see through walls. shortcut: tree trunks don't block sight yet; add them if hiding behind trees should work.
-    this.sight = (tx, ty) => !!layers.Walls?.getTileAt(tx, ty)?.collides;
     const weather = (map.properties as { name: string; value: unknown }[]).find((p) => p.name === 'weather')?.value;
     Object.assign(tuning, WEATHER[isWeather(weather) ? weather : DEFAULT_WEATHER]);
     this.solid = (tx, ty) => colliders.some((l) => l.getTileAt(tx, ty)?.collides);
@@ -165,6 +163,14 @@ export class LevelScene extends Phaser.Scene {
     this.physics.add.collider(this.sprites, this.pack);
     this.physics.add.collider(this.pack, blockers);
     this.physics.add.collider(this.pack, this.pack); // dogs bump into each other: nobody gets pushed, the overlap is split
+    // What dogs can't see through: tiles with blocksSight (default: colliding Walls tiles, see the world blueprint) and
+    // trees whose type has blocksSight.
+    const tileBlocksSight: SolidAt = (tx, ty) => TILE_LAYERS.some((name) => {
+      const tile = layers[name]?.getTileAt(tx, ty);
+      const own = (tile?.properties as { blocksSight?: boolean } | undefined)?.blocksSight;
+      return !!tile && (own ?? (name === 'Walls' && tile.collides));
+    });
+    this.sight = this.navGrid(map.width, map.height, this.trees.sightBlocks, tileBlocksSight);
     const nav = (this.nav = this.navGrid(map.width, map.height, [...this.trees.bodies, ...this.dogs.sprites.map((d) => d.body as Phaser.Physics.Arcade.Body)]));
     for (const d of this.brains) Object.assign(d, { nav, sight: this.sight });
     this.leaves = new FallingLeaves(this, this.trees.sources);
@@ -319,12 +325,13 @@ export class LevelScene extends Phaser.Scene {
   }
 
   /**
-   * Tiles dogs path around: solid tiles plus any tile a trunk or standing dog's body touches.
+   * A tile grid of `base` tiles plus any tile one of `bodies` touches: what dogs path around (trunks, standing dogs) or
+   * can't see through (sight blockers).
    * shortcut: built once, so it doesn't know about things that move or appear later; rebuild it when they exist.
    */
-  private navGrid(w: number, h: number, bodies: { x: number; y: number; width: number; height: number }[]): SolidAt {
+  private navGrid(w: number, h: number, bodies: { x: number; y: number; width: number; height: number }[], base: SolidAt = this.solid): SolidAt {
     const blocked = new Uint8Array(w * h);
-    for (let ty = 0; ty < h; ty++) for (let tx = 0; tx < w; tx++) blocked[ty * w + tx] = this.solid(tx, ty) ? 1 : 0;
+    for (let ty = 0; ty < h; ty++) for (let tx = 0; tx < w; tx++) blocked[ty * w + tx] = base(tx, ty) ? 1 : 0;
     for (const b of bodies)
       for (let ty = toTile(b.y); ty <= toTile(b.y + b.height - 0.001); ty++)
         for (let tx = toTile(b.x); tx <= toTile(b.x + b.width - 0.001); tx++) if (tx >= 0 && ty >= 0 && tx < w && ty < h) blocked[ty * w + tx] = 1;

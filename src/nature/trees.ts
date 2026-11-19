@@ -67,6 +67,8 @@ interface Tree {
 
 export class Trees {
   readonly bodies: Phaser.Physics.Arcade.StaticBody[] = [];
+  /** Areas dogs can't see through, from trees whose type has blocksSight. */
+  readonly sightBlocks: { x: number; y: number; width: number; height: number }[] = [];
   readonly sources: LeafSource[] = [];
   private trees: Tree[] = [];
   private parts = new Map<string, Parts>();
@@ -94,6 +96,7 @@ export class Trees {
         litter: t.litter ?? 0,
       });
       if (t.block) this.bodies.push(scene.physics.add.staticBody(x - t.block.w / 2, y - t.block.h, t.block.w, t.block.h));
+      if (t.blocksSight) this.sightBlocks.push(t.block ? { x: x - t.block.w / 2, y: y - t.block.h, width: t.block.w, height: t.block.h } : { x: x - 1, y: y - 2, width: 2, height: 2 });
       this.trees.push({ sprite, tex, parts, type: t, offsets: new Int8Array(parts.clumps.length * 2).fill(99), flex: 0.8 + ((o.id * 7919) % 100) / 250 }); // trees differ a little in stiffness
     }
   }
