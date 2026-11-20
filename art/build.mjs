@@ -1,7 +1,8 @@
 // Builds every character into public/assets/sprites/<id>.png + <id>.anims.json (art blueprint §4).
-// Hand-typed: art/characters/<id>.mjs (Piskel-style route).
+// Hand-typed: art/characters/<id>.mjs (Piskel-style route; none left, all four come from PixelLab now).
 // PixelLab: art/pixellab/<id>/rotations/<direction>.png and, once made, animations/<idle|walk|run>/<direction>/frame_NNN.png
-// (the layout of PixelLab's character ZIP). Every pixel must be a palette color, or the build fails.
+// (the layout of PixelLab's character ZIP). Every pixel must be a palette color, or the build fails,
+// except for characters in OWN_COLORS, whose stills keep PixelLab's colors as generated.
 // `node art/build.mjs --preview <dir>` also writes 8× previews there for review.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,7 +21,8 @@ function write(id, { frames, palette, anims, size, columns }) {
   console.log('built', id);
 }
 
-for (const file of fs.readdirSync(path.join(import.meta.dirname, 'characters'))) {
+const typed = path.join(import.meta.dirname, 'characters');
+for (const file of fs.existsSync(typed) ? fs.readdirSync(typed) : []) {
   write(path.basename(file, '.mjs'), await import(`./characters/${file}`));
 }
 
@@ -28,18 +30,26 @@ for (const file of fs.readdirSync(path.join(import.meta.dirname, 'characters')))
 const ROWS = { down: 'south', 'down-side': 'south-east', side: 'east', 'up-side': 'north-east', up: 'north' };
 const charOf = new Map(colors.map((c, i) => [c, String.fromCharCode(0x100 + i)]));
 const palette = Object.fromEntries([...charOf].map(([c, ch]) => [ch, c]));
+/** Kept exactly as PixelLab drew them (Marcus's call): Christian's off-palette skin and suit. */
+const OWN_COLORS = new Set(['christian']);
+const addColor = (rgb) => {
+  const ch = String.fromCharCode(0x100 + charOf.size);
+  charOf.set(rgb, ch);
+  palette[ch] = rgb;
+};
 
 /**
  * A PNG as a hand-typed frame: one char per pixel, '.' transparent.
  * Without `snapTo`, an off-palette or half-transparent pixel throws. With it (a Set of the character's own colors),
  * off-palette pixels become the closest of those, so skin stays skin rather than snapping to the nearest sand.
  */
-function frameOf(file, snapTo, stats) {
+function frameOf(file, snapTo, stats, ownColors = false) {
   const { w, h, px } = decode(fs.readFileSync(file));
   return Array.from({ length: h }, (_, y) => Array.from({ length: w }, (_, x) => {
     const i = (y * w + x) * 4;
     if (px[i + 3] === 0) return '.';
     let rgb = (px[i] << 16) | (px[i + 1] << 8) | px[i + 2];
+    if (ownColors && px[i + 3] === 255 && !charOf.has(rgb)) addColor(rgb);
     if (px[i + 3] !== 255 || !charOf.has(rgb)) {
       if (!snapTo) throw new Error(`${file} (${x},${y}): #${rgb.toString(16).padStart(6, '0')} alpha ${px[i + 3]} is not in the palette`);
       rgb = closest(rgb, snapTo);
@@ -58,9 +68,9 @@ const plDir = path.join(import.meta.dirname, 'pixellab');
 for (const id of fs.existsSync(plDir) ? fs.readdirSync(plDir) : []) {
   const dir = path.join(plDir, id);
   if (!fs.statSync(dir).isDirectory()) continue;
-  // Rotations must be exactly on the palette. PixelLab's template animations can't take a palette and drift,
+  // Rotations must be exactly on the palette (or kept as drawn, see OWN_COLORS). PixelLab's template animations can't take a palette and drift,
   // so their frames are snapped onto the colors the rotations use.
-  const stills = Object.fromEntries(Object.values(ROWS).map((d) => [d, frameOf(path.join(dir, 'rotations', `${d}.png`))]));
+  const stills = Object.fromEntries(Object.values(ROWS).map((d) => [d, frameOf(path.join(dir, 'rotations', `${d}.png`), null, null, OWN_COLORS.has(id))]));
   const own = new Set(Object.values(stills).flatMap((f) => [...f.join('')]).filter((c) => c !== '.').map((c) => palette[c]));
   const stats = { snapped: 0 };
   const animOf = (name, d) => {
@@ -69,7 +79,7 @@ for (const id of fs.existsSync(plDir) ? fs.readdirSync(plDir) : []) {
   };
   // Columns per row: the still, then each animation's frames in its own block. Missing animations are left out of anims.json;
   // without an idle animation, idle is the still.
-  const ANIMS = { idle: 4, walk: 10, run: 16 }; // frame rates; walk and run are at full speed, the game scales them with velocity
+  const ANIMS = { idle: 4, walk: 10, run: 16, jab: 12, cross: 24, kick: 16 }; // frame rates; walk and run are at full speed, the game scales them with velocity; attacks are timed to the swing by the game
   const rows = Object.entries(ROWS).map(([row, d]) => ({ row, still: stills[d], ...Object.fromEntries(Object.keys(ANIMS).map((a) => [a, animOf(a, d)])) }));
   if (stats.snapped) console.log(`  ${id}: snapped ${stats.snapped} animation pixels onto its own colors`);
   const width = Object.fromEntries(Object.keys(ANIMS).map((a) => [a, Math.max(...rows.map((r) => r[a].length))]));

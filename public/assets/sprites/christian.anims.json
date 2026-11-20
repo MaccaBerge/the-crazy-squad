@@ -4,83 +4,323 @@
   "anims": {
     "idle-down": {
       "frames": [
-        0,
-        1
+        1,
+        2,
+        3,
+        4
       ],
-      "frameRate": 2.2
+      "frameRate": 4
     },
     "walk-down": {
       "frames": [
-        2,
-        3,
-        4,
-        5
-      ],
-      "frameRate": 10
-    },
-    "idle-down-side": {
-      "frames": [
+        5,
         6,
-        7
-      ],
-      "frameRate": 2.2
-    },
-    "walk-down-side": {
-      "frames": [
+        7,
         8,
         9,
-        10,
-        11
+        10
       ],
       "frameRate": 10
     },
-    "idle-side": {
+    "run-down": {
       "frames": [
+        11,
         12,
-        13
-      ],
-      "frameRate": 2.2
-    },
-    "walk-side": {
-      "frames": [
+        13,
         14,
         15,
         16,
-        17
+        17,
+        18
+      ],
+      "frameRate": 16
+    },
+    "jab-down": {
+      "frames": [
+        19,
+        20,
+        21
+      ],
+      "frameRate": 12
+    },
+    "cross-down": {
+      "frames": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27
+      ],
+      "frameRate": 24
+    },
+    "kick-down": {
+      "frames": [
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34
+      ],
+      "frameRate": 16
+    },
+    "idle-down-side": {
+      "frames": [
+        36,
+        37,
+        38,
+        39
+      ],
+      "frameRate": 4
+    },
+    "walk-down-side": {
+      "frames": [
+        40,
+        41,
+        42,
+        43,
+        44,
+        45
       ],
       "frameRate": 10
+    },
+    "run-down-side": {
+      "frames": [
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53
+      ],
+      "frameRate": 16
+    },
+    "jab-down-side": {
+      "frames": [
+        54,
+        55,
+        56
+      ],
+      "frameRate": 12
+    },
+    "cross-down-side": {
+      "frames": [
+        57,
+        58,
+        59,
+        60,
+        61,
+        62
+      ],
+      "frameRate": 24
+    },
+    "kick-down-side": {
+      "frames": [
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69
+      ],
+      "frameRate": 16
+    },
+    "idle-side": {
+      "frames": [
+        71,
+        72,
+        73,
+        74
+      ],
+      "frameRate": 4
+    },
+    "walk-side": {
+      "frames": [
+        75,
+        76,
+        77,
+        78,
+        79,
+        80
+      ],
+      "frameRate": 10
+    },
+    "run-side": {
+      "frames": [
+        81,
+        82,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88
+      ],
+      "frameRate": 16
+    },
+    "jab-side": {
+      "frames": [
+        89,
+        90,
+        91
+      ],
+      "frameRate": 12
+    },
+    "cross-side": {
+      "frames": [
+        92,
+        93,
+        94,
+        95,
+        96,
+        97
+      ],
+      "frameRate": 24
+    },
+    "kick-side": {
+      "frames": [
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104
+      ],
+      "frameRate": 16
     },
     "idle-up-side": {
       "frames": [
-        18,
-        19
+        106,
+        107,
+        108,
+        109
       ],
-      "frameRate": 2.2
+      "frameRate": 4
     },
     "walk-up-side": {
       "frames": [
-        20,
-        21,
-        22,
-        23
+        110,
+        111,
+        112,
+        113,
+        114,
+        115
       ],
       "frameRate": 10
+    },
+    "run-up-side": {
+      "frames": [
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123
+      ],
+      "frameRate": 16
+    },
+    "jab-up-side": {
+      "frames": [
+        124,
+        125,
+        126
+      ],
+      "frameRate": 12
+    },
+    "cross-up-side": {
+      "frames": [
+        127,
+        128,
+        129,
+        130,
+        131,
+        132
+      ],
+      "frameRate": 24
+    },
+    "kick-up-side": {
+      "frames": [
+        133,
+        134,
+        135,
+        136,
+        137,
+        138,
+        139
+      ],
+      "frameRate": 16
     },
     "idle-up": {
       "frames": [
-        24,
-        25
+        141,
+        142,
+        143,
+        144
       ],
-      "frameRate": 2.2
+      "frameRate": 4
     },
     "walk-up": {
       "frames": [
-        26,
-        27,
-        28,
-        29
+        145,
+        146,
+        147,
+        148,
+        149,
+        150
       ],
       "frameRate": 10
+    },
+    "run-up": {
+      "frames": [
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158
+      ],
+      "frameRate": 16
+    },
+    "jab-up": {
+      "frames": [
+        159,
+        160,
+        161
+      ],
+      "frameRate": 12
+    },
+    "cross-up": {
+      "frames": [
+        162,
+        163,
+        164,
+        165,
+        166,
+        167
+      ],
+      "frameRate": 24
+    },
+    "kick-up": {
+      "frames": [
+        168,
+        169,
+        170,
+        171,
+        172,
+        173,
+        174
+      ],
+      "frameRate": 16
     }
   }
 }

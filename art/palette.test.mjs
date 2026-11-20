@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { colors, ramps, inPalette, nearest, tintOutlines } from './palette.mjs';
-import * as christian from './characters/christian.mjs';
 
 describe('palette', () => {
   it('has no pure black, pure white or grey', () => {
@@ -26,9 +25,5 @@ describe('palette', () => {
     expect(palette[top[1]]).toBe(ramps.skin.outline);
     expect(palette[bottom[1]]).toBe(ramps.leaf.outline);
     expect(frames[0][1]).toBe('.o.'); // borders nothing → keeps the fallback
-  });
-
-  it('character sprites use only palette colors', () => {
-    for (const c of Object.values(christian.palette)) expect(inPalette(c), `#${c.toString(16)}`).toBe(true);
   });
 });

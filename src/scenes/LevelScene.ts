@@ -26,7 +26,7 @@ import { DOG_KINDS, Dogs, isDogKind, preloadDogs } from '../dogs/dogs';
 import { BREEDS } from '../dogs/breeds';
 import { DogAI } from '../dogs/dogAI';
 import type { Vec } from '../movement';
-import { inArc, type Swing, swingPhase } from '../combat/swing';
+import { comboStep, inArc, type Swing, swingPhase } from '../combat/swing';
 import { ringSlots, separation } from '../ai/separation';
 import { HUNTING } from '../ai/dogBrain';
 
@@ -35,6 +35,7 @@ const MAP = new URLSearchParams(location.search).get('map') ?? 'test'; // dev: ?
 const STRESS_BLADES = Number(new URLSearchParams(location.search).get('grass')) || 0;
 const NUDGE_SPEED = 0.6; // corner assist sideways speed, as a share of top speed
 const HURT = 0.18; // seconds a hit pushes you around before your input counts again
+const SPARK = 140; // ms a hit spark lasts
 const ATTACK_SLOW = 0.4; // share of walking speed while swinging: you can creep, not run (combat blueprint §3)
 
 /** Live-tunable values (T panel). Character stats multiply the movement values. */
@@ -89,7 +90,9 @@ export class LevelScene extends Phaser.Scene {
   private sight?: SolidAt;
   private spawned = 0;
   private hurt = 0;
-  private swing?: { def: Swing; t: number; hit: Set<DogAI> };
+  private swing?: { def: Swing; step: number; t: number; hit: Set<DogAI> };
+  private combo = { step: -1, since: 0 }; // the last combo step swung, and s since it ended
+  private sparks: { x: number; y: number; at: number; big: boolean }[] = []; // hit sparks, drawn for SPARK ms
   private swingFx!: Phaser.GameObjects.Graphics;
   private frozenUntil = 0;
   private knock: Vec = { x: 0, y: 0 };
@@ -116,6 +119,8 @@ export class LevelScene extends Phaser.Scene {
     this.brains = [];
     this.hurt = 0;
     this.swing = undefined;
+    this.combo = { step: -1, since: 0 };
+    this.sparks = [];
     this.frozenUntil = 0;
     const { map, layers, colliders } = loadMap(this, MAP);
     const weather = (map.properties as { name: string; value: unknown }[]).find((p) => p.name === 'weather')?.value;
@@ -260,6 +265,9 @@ export class LevelScene extends Phaser.Scene {
     if (nudge?.x) v.x = nudge.x * p.maxSpeed * NUDGE_SPEED;
     if (nudge?.y) v.y = nudge.y * p.maxSpeed * NUDGE_SPEED;
     b.setVelocity(v.x, v.y);
+    const sw = this.swing;
+    if (sw?.def.lunge && swingPhase(sw.def, sw.t) === 'active')
+      b.setVelocity((this.facing.x * sw.def.lunge) / sw.def.active, (this.facing.y * sw.def.lunge) / sw.def.active);
 
     if (this.swing) return; // facing is locked from windup to the end of recovery, so a swing can't turn mid-arc
     if (intent.move.x || intent.move.y) {
@@ -271,22 +279,30 @@ export class LevelScene extends Phaser.Scene {
 
   /** The active character's basic attack (combat blueprint §3): start it on a press, hit dogs in the arc while it's active. */
   private attack(pressed: boolean, dt: number) {
-    const def = this.party.active.attack;
+    const steps = this.party.active.attack;
+    if (!this.swing) this.combo.since += dt;
     if (pressed && !this.swing && this.hurt <= 0) {
       this.controller.consume('attack'); // while swinging the press stays buffered, so mashing chains swings
-      if (def) this.swing = { def, t: 0, hit: new Set() };
+      const step = steps && comboStep(steps.length, this.combo.step, this.combo.since);
+      if (steps && step !== undefined) this.swing = { def: steps[step], step, t: 0, hit: new Set() };
     }
     const sw = this.swing;
     if (!sw) return;
     sw.t += dt;
     const phase = swingPhase(sw.def, sw.t);
-    if (phase === 'done') return void (this.swing = undefined);
+    if (phase === 'done') {
+      this.combo = { step: sw.step, since: 0 };
+      return void (this.swing = undefined);
+    }
     if (phase !== 'active') return;
     const s = this.active, f = this.facing;
     for (const d of this.brains) {
       if (d.out || sw.hit.has(d) || !inArc(sw.def, s, f, d.sprite)) continue;
       sw.hit.add(d);
-      if (d.takeHit(sw.def.damage, { x: f.x * sw.def.knockback, y: f.y * sw.def.knockback })) this.freeze(sw.def.heavy ? tuning.heavyHitstop : tuning.hitstop);
+      if (!d.takeHit(sw.def.damage, { x: f.x * sw.def.knockback, y: f.y * sw.def.knockback })) continue;
+      this.freeze(sw.def.hitstop ?? (sw.def.heavy ? tuning.heavyHitstop : tuning.hitstop));
+      this.sparks.push({ x: d.sprite.x - f.x * 5, y: d.sprite.y - 10 - f.y * 3, at: this.time.now, big: !!sw.def.shake });
+      if (sw.def.shake) this.cameras.main.shake(90, 0.006);
     }
   }
 
@@ -342,6 +358,7 @@ export class LevelScene extends Phaser.Scene {
     const to = this.active;
     const { x: vx, y: vy } = from.body.velocity;
     this.swing = undefined; // swapping cancels whatever the old one was doing
+    this.combo = { step: -1, since: 0 };
     offStage(from);
     onStage(to, from.x, from.y);
     to.body.setVelocity(vx, vy);
@@ -361,7 +378,8 @@ export class LevelScene extends Phaser.Scene {
     const i = this.party.activeIndex, health = this.party.health[i];
     if (!health.take(damage, tuning.iframes)) return; // invincible: no push either
     this.freeze(tuning.hitstop);
-    this.swing = undefined; // a hit interrupts your attack
+    this.swing = undefined; // a hit interrupts your attack, and its combo
+    this.combo = { step: -1, since: 0 };
     this.hurt = HURT;
     this.knock = push;
     this.flash(this.active, 0xb4443a);
@@ -402,7 +420,13 @@ export class LevelScene extends Phaser.Scene {
       const run = `${sprite}/run-${row}`;
       const running = this.sprinting && this.anims.exists(run);
       const key = running ? run : `${sprite}/${speed > 5 ? 'walk' : 'idle'}-${row}`;
-      s.setFlipX(flip).play(key, true);
+      const sw = this.swing, hit = sw?.def.anim && this.anims.get(`${sprite}/${sw.def.anim}-${row}`);
+      if (sw && hit) {
+        // The attack animation runs once over the swing, frame picked by how far into it we are.
+        const total = sw.def.windup + sw.def.active + sw.def.recovery, n = hit.frames.length;
+        s.anims.stop();
+        s.setFlipX(flip).setFrame(hit.frames[Math.min(n - 1, Math.floor((sw.t / total) * n))].textureFrame);
+      } else s.setFlipX(flip).play(key, true);
       // Playback follows speed, so feet don't slide while speeding up or slowing down. Full rate at sprint speed for the
       // run and at walk speed for the walk (a character without a run plays its walk faster while sprinting).
       const full = this.moveParams(this.party.active, running).maxSpeed;
@@ -431,12 +455,33 @@ export class LevelScene extends Phaser.Scene {
   /** Placeholder for the wrench: a pale arc sweeping across the front during the active part, fading in recovery. */
   private drawSwing(s: CharSprite) {
     const g = this.swingFx.clear(), sw = this.swing;
+    this.drawSparks(g);
     if (!sw) return;
     const d = sw.def, into = sw.t - d.windup;
     if (into < 0) return;
-    const half = ((d.arc / 2) * Math.PI) / 180, a = Math.atan2(this.facing.y, this.facing.x);
+    const a = Math.atan2(this.facing.y, this.facing.x), f = this.facing;
     const sweep = Math.min(1, into / d.active), fade = into <= d.active ? 1 : 1 - (into - d.active) / d.recovery;
+    if (d.streak) {
+      // A jab: a short straight streak shooting out in front.
+      const from = 4, to = from + (d.radius - from) * sweep, y = s.y - 9;
+      g.lineStyle(1, 0xe6faf6, 0.8 * fade).lineBetween(s.x + f.x * from, y + f.y * from, s.x + f.x * to, y + f.y * to);
+      return;
+    }
+    const half = ((d.arc / 2) * Math.PI) / 180;
     g.lineStyle(2, 0xe6faf6, 0.9 * fade).beginPath().arc(s.x, s.y - 6, d.radius - 6, a - half, a - half + 2 * half * sweep).strokePath();
+  }
+
+  /** Hit sparks: a burst of short rays where a hit landed, growing and fading over SPARK ms. Big ones for kicks and the wrench. */
+  private drawSparks(g: Phaser.GameObjects.Graphics) {
+    this.sparks = this.sparks.filter((p) => this.time.now - p.at < SPARK);
+    for (const p of this.sparks) {
+      const k = (this.time.now - p.at) / SPARK, r = (p.big ? 3 : 2) + k * (p.big ? 6 : 4), rays = p.big ? 8 : 6;
+      g.fillStyle(0xfff6dc, 1 - k).fillRect(Math.round(p.x) - 1, Math.round(p.y) - 1, 2, 2);
+      for (let i = 0; i < rays; i++) {
+        const a = (i / rays) * Math.PI * 2 + (p.big ? 0 : 0.4);
+        g.fillStyle(i % 2 ? 0xf2a846 : 0xfff6dc, 1 - k).fillRect(Math.round(p.x + Math.cos(a) * r), Math.round(p.y + Math.sin(a) * r * 0.7), 1, 1);
+      }
+    }
   }
 
   /** One arrow per tile in view, pointing where the wind blows there: length is its strength, orange where a gust is passing. */

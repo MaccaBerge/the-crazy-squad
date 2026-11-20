@@ -13,6 +13,9 @@ export type CharacterDef = {
   body: { w: number; h: number };
   /** maxHp in points. speed and accel are multipliers on the shared movement tuning, so the T panel still tunes everyone at once. */
   stats: { maxHp: number; speed: number; accel: number };
-  /** Basic attack (combat blueprint §3). shortcut: only melee swings so far; the others get theirs in later build steps. */
-  attack?: Swing;
+  /**
+   * Basic attack (combat blueprint §3): one swing, or several that chain as a combo when pressed again in time.
+   * shortcut: only melee swings so far; the others get theirs in later build steps.
+   */
+  attack?: Swing[];
 };

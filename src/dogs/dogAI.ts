@@ -165,6 +165,8 @@ export class DogAI {
   update(now: number, showDebug: boolean) {
     const s = this.sprite, state = this.brain.state;
     s.setDepth(DEPTH.actors + s.y);
+    const squash = this.flashT > 0 && !this.out; // squashed by the hit for a moment (flashT stops counting once knocked out)
+    s.setScale(squash ? 1.2 : 1, squash ? 0.85 : 1);
     if (this.out) return this.knockedOut(now);
     const speed = s.body.velocity.length();
     const anim = speed > 5 && (state === 'chase' || state === 'search') ? 'walk' : 'idle';
