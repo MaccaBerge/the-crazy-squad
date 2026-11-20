@@ -297,8 +297,7 @@ export class LevelScene extends Phaser.Scene {
   private freeze(ms: number) {
     const world = this.physics.world;
     this.frozenUntil = Math.max(this.frozenUntil, this.time.now + ms);
-    world.pause();
-    this.time.delayedCall(ms, () => this.time.now >= this.frozenUntil - 1 && world.resume());
+    world.pause(); // update() resumes it
   }
 
   /** Dev spawn: the next breed, on the first free spot about 4 tiles from you. */
@@ -385,6 +384,11 @@ export class LevelScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number) {
+    // Checked every frame against the clock: a timer here ran on smoothed frame time and could fire early, leaving the world paused for good.
+    if (this.frozenUntil && this.time.now >= this.frozenUntil) {
+      this.frozenUntil = 0;
+      this.physics.world.resume();
+    }
     const s = this.active;
     s.setDepth(DEPTH.actors + s.y); // y-sort by feet
     // Invincibility frames show as flicker.
