@@ -26,7 +26,7 @@ import { DOG_KINDS, Dogs, isDogKind, preloadDogs } from '../dogs/dogs';
 import { BREEDS } from '../dogs/breeds';
 import { DogAI } from '../dogs/dogAI';
 import type { Vec } from '../movement';
-import { inArc, type Swing, swingPhase } from '../combat/swing';
+import { comboStep, inArc, type Swing, swingPhase } from '../combat/swing';
 import { ringSlots, separation } from '../ai/separation';
 import { HUNTING } from '../ai/dogBrain';
 
@@ -89,7 +89,8 @@ export class LevelScene extends Phaser.Scene {
   private sight?: SolidAt;
   private spawned = 0;
   private hurt = 0;
-  private swing?: { def: Swing; t: number; hit: Set<DogAI> };
+  private swing?: { def: Swing; step: number; t: number; hit: Set<DogAI> };
+  private combo = { step: -1, since: 0 }; // the last combo step swung, and s since it ended
   private swingFx!: Phaser.GameObjects.Graphics;
   private frozenUntil = 0;
   private knock: Vec = { x: 0, y: 0 };
@@ -116,6 +117,7 @@ export class LevelScene extends Phaser.Scene {
     this.brains = [];
     this.hurt = 0;
     this.swing = undefined;
+    this.combo = { step: -1, since: 0 };
     this.frozenUntil = 0;
     const { map, layers, colliders } = loadMap(this, MAP);
     const weather = (map.properties as { name: string; value: unknown }[]).find((p) => p.name === 'weather')?.value;
@@ -271,16 +273,21 @@ export class LevelScene extends Phaser.Scene {
 
   /** The active character's basic attack (combat blueprint §3): start it on a press, hit dogs in the arc while it's active. */
   private attack(pressed: boolean, dt: number) {
-    const def = this.party.active.attack;
+    const steps = this.party.active.attack;
+    if (!this.swing) this.combo.since += dt;
     if (pressed && !this.swing && this.hurt <= 0) {
       this.controller.consume('attack'); // while swinging the press stays buffered, so mashing chains swings
-      if (def) this.swing = { def, t: 0, hit: new Set() };
+      const step = steps && comboStep(steps.length, this.combo.step, this.combo.since);
+      if (steps && step !== undefined) this.swing = { def: steps[step], step, t: 0, hit: new Set() };
     }
     const sw = this.swing;
     if (!sw) return;
     sw.t += dt;
     const phase = swingPhase(sw.def, sw.t);
-    if (phase === 'done') return void (this.swing = undefined);
+    if (phase === 'done') {
+      this.combo = { step: sw.step, since: 0 };
+      return void (this.swing = undefined);
+    }
     if (phase !== 'active') return;
     const s = this.active, f = this.facing;
     for (const d of this.brains) {
@@ -342,6 +349,7 @@ export class LevelScene extends Phaser.Scene {
     const to = this.active;
     const { x: vx, y: vy } = from.body.velocity;
     this.swing = undefined; // swapping cancels whatever the old one was doing
+    this.combo = { step: -1, since: 0 };
     offStage(from);
     onStage(to, from.x, from.y);
     to.body.setVelocity(vx, vy);
@@ -361,7 +369,8 @@ export class LevelScene extends Phaser.Scene {
     const i = this.party.activeIndex, health = this.party.health[i];
     if (!health.take(damage, tuning.iframes)) return; // invincible: no push either
     this.freeze(tuning.hitstop);
-    this.swing = undefined; // a hit interrupts your attack
+    this.swing = undefined; // a hit interrupts your attack, and its combo
+    this.combo = { step: -1, since: 0 };
     this.hurt = HURT;
     this.knock = push;
     this.flash(this.active, 0xb4443a);

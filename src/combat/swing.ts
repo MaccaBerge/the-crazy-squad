@@ -27,3 +27,11 @@ export function inArc(s: Swing, from: Vec, facing: Vec, to: Vec) {
   if (d > s.radius) return false;
   return d < 1e-6 || (dx * facing.x + dy * facing.y) / d >= Math.cos(((s.arc / 2) * Math.PI) / 180);
 }
+
+/** s after a combo step ends that another press continues to the next step (combat blueprint §3). */
+export const COMBO_WINDOW = 0.3;
+
+/** Which step of a `steps`-long combo a press starts, given the last step and the s since it ended. */
+export function comboStep(steps: number, last: number, since: number) {
+  return last + 1 < steps && since <= COMBO_WINDOW ? last + 1 : 0;
+}
