@@ -11,6 +11,11 @@ export type Swing = {
   arc: number; // degrees, centred on facing
   knockback: number; // px/s push given to whoever is hit
   heavy?: boolean; // longer hit freeze
+  hitstop?: number; // ms the world freezes when it lands; default: the tuning's hitstop or heavyHitstop
+  lunge?: number; // px the attacker steps forward during the active part, so the hit has weight behind it
+  shake?: boolean; // a small camera shake when it lands
+  streak?: boolean; // drawn as a straight jab streak instead of an arc
+  anim?: string; // sprite animation (e.g. 'jab'), played once over the whole swing
 };
 
 export type SwingPhase = 'windup' | 'active' | 'recovery' | 'done';

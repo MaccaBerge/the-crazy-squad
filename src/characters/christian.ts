@@ -10,8 +10,9 @@ export const christian: CharacterDef = {
   stats: { maxHp: 100, speed: 1, accel: 1.1 },
   // Punch, punch, kick: fast and light, only the kick pushes (combat blueprint §3).
   attack: [
-    { damage: 10, windup: 0.05, active: 0.06, recovery: 0.12, radius: 14, arc: 90, knockback: 0 },
-    { damage: 10, windup: 0.05, active: 0.06, recovery: 0.12, radius: 14, arc: 90, knockback: 0 },
-    { damage: 18, windup: 0.05, active: 0.06, recovery: 0.3, radius: 14, arc: 90, knockback: 120 },
+    // Short freezes keep the punches snappy; the kick's long one, lunge and shake make the finisher land.
+    { damage: 10, windup: 0.05, active: 0.06, recovery: 0.12, radius: 14, arc: 90, knockback: 0, hitstop: 30, lunge: 3, streak: true, anim: 'jab' },
+    { damage: 10, windup: 0.05, active: 0.06, recovery: 0.12, radius: 14, arc: 90, knockback: 0, hitstop: 30, lunge: 3, streak: true, anim: 'cross' },
+    { damage: 18, windup: 0.05, active: 0.06, recovery: 0.3, radius: 14, arc: 90, knockback: 120, hitstop: 80, lunge: 6, shake: true, anim: 'kick' },
   ],
 };
