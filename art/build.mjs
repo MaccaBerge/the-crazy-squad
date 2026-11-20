@@ -79,7 +79,7 @@ for (const id of fs.existsSync(plDir) ? fs.readdirSync(plDir) : []) {
   };
   // Columns per row: the still, then each animation's frames in its own block. Missing animations are left out of anims.json;
   // without an idle animation, idle is the still.
-  const ANIMS = { idle: 4, walk: 10, run: 16 }; // frame rates; walk and run are at full speed, the game scales them with velocity
+  const ANIMS = { idle: 4, walk: 10, run: 16, jab: 12, cross: 24, kick: 16 }; // frame rates; walk and run are at full speed, the game scales them with velocity; attacks are timed to the swing by the game
   const rows = Object.entries(ROWS).map(([row, d]) => ({ row, still: stills[d], ...Object.fromEntries(Object.keys(ANIMS).map((a) => [a, animOf(a, d)])) }));
   if (stats.snapped) console.log(`  ${id}: snapped ${stats.snapped} animation pixels onto its own colors`);
   const width = Object.fromEntries(Object.keys(ANIMS).map((a) => [a, Math.max(...rows.map((r) => r[a].length))]));
