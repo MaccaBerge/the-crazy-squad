@@ -54,6 +54,7 @@ export const tuning = {
   packRing: 18, // px from you to each hunting dog's spot in the ring (inside their reach, so they can still bite)
   slowmo: 0.3, // world speed during Christian's slow-mo (everything but him)
   slowmoSpeed: 1.6, // and his own speed and acceleration then, so he looks even faster next to the slowed world
+  speedLightning: 0, // 1: lightning off his body and along his trail during slow-mo; 0: afterimages only (testing)
   ...WEATHER[DEFAULT_WEATHER], // replaced by the map's weather on load
 };
 
@@ -527,7 +528,7 @@ export class LevelScene extends Phaser.Scene {
     const k = this.slowmo && tuning.slowmo < 1 ? Phaser.Math.Clamp((1 - this.slow) / (1 - tuning.slowmo), 0, 1) : 0;
     this.shade.setVisible(k > 0);
     this.vignette.setActive(k > 0);
-    this.speedFx.update(this.time.now, s, k);
+    this.speedFx.update(this.time.now, s, k, tuning.speedLightning > 0);
     if (!k) return;
     const view = this.cameras.main.worldView, c = Phaser.Display.Color.Interpolate.ColorWithColor(Phaser.Display.Color.ValueToColor(0xffffff), Phaser.Display.Color.ValueToColor(SLOWMO.shade), 1, k);
     this.shade.setPosition(view.x - 8, view.y - 8).setSize(view.width + 16, view.height + 16).setFillStyle(Phaser.Display.Color.GetColor(c.r, c.g, c.b));

@@ -5,6 +5,7 @@ import { drawLightning, type Lightning, lightning, SLOWMO } from './slowmo';
 
 const TRAIL_MS = 600; // how far back the lightning trail reaches
 const ARC_EVERY = 30; // ms between new arcs off the body
+const GHOST_GAP = 14; // px he runs between afterimages when they carry the look, so each reads as its own figure
 const LIGHT = 'speed-light';
 type Sprite = Phaser.GameObjects.Sprite & { body: Phaser.Physics.Arcade.Body };
 type Arc = { l: Lightning; born: number; life: number };
@@ -22,6 +23,7 @@ export class SpeedFx {
   private arcs: Arc[] = []; // relative to his chest, so they ride along with him
   private nextArc = 0;
   private nextGhost = 0;
+  private lastGhost: Vec = { x: 0, y: 0 };
 
   constructor(private scene: Phaser.Scene) {
     this.glow = scene.add.graphics().setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.effects + 1);
@@ -38,8 +40,8 @@ export class SpeedFx {
     this.light = scene.add.image(0, 0, LIGHT).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.effects - 2.75).setScale(3.5).setTint(SLOWMO.orange).setVisible(false);
   }
 
-  /** Per rendered frame. `k` is how strong slow-mo is right now (0 off, 1 full). */
-  update(now: number, s: Sprite, k: number) {
+  /** Per rendered frame. `k` is how strong slow-mo is right now (0 off, 1 full). `bolts` off: afterimages carry the look. */
+  update(now: number, s: Sprite, k: number, bolts = true) {
     const glow = this.glow.clear(), core = this.core.clear();
     if (k <= 0) {
       this.light.setVisible(false);
@@ -54,7 +56,8 @@ export class SpeedFx {
     this.light.setVisible(true).setPosition(chest.x, chest.y).setAlpha(k * (0.5 + 0.12 * Math.sin(now / 45) + Math.random() * 0.1));
 
     // Trail: live strands of lightning along where he just ran, re-jagged every frame so they writhe, fading behind.
-    if (moving) this.trail.push({ x: chest.x, y: chest.y, t: now });
+    if (!bolts) (this.trail = []), (this.arcs = []);
+    if (moving && bolts) this.trail.push({ x: chest.x, y: chest.y, t: now });
     this.trail = this.trail.filter((p) => now - p.t < TRAIL_MS);
     if (this.trail.length > 3) {
       const pts = this.trail.filter((_, i) => i % 3 === 0 || i === this.trail.length - 1);
@@ -68,7 +71,7 @@ export class SpeedFx {
     }
 
     // Arcs off his body: they start on him and reach out, swept behind him when he runs. Each lives a few frames.
-    if (now >= this.nextArc) {
+    if (bolts && now >= this.nextArc) {
       this.nextArc = now + ARC_EVERY;
       for (let n = 0; n < 2; n++) {
         const from = { x: (Math.random() * 2 - 1) * 5, y: (Math.random() * 2 - 1) * 10 };
@@ -83,12 +86,19 @@ export class SpeedFx {
       drawLightning(glow, core, a.l, k * flick * (1 - (now - a.born) / a.life), { at: chest, thin: true });
     }
 
-    // Afterimages: additive orange copies of him that fade fast, under the lightning.
-    if (moving && now >= this.nextGhost) {
+    // Afterimages: copies of him left behind as he runs. With the lightning they're a faint orange glow; without, they
+    // carry the look: brighter, longer, and cooling from gold through orange to red as they fade, a speedster's streak.
+    if (moving && (bolts ? now >= this.nextGhost : Phaser.Math.Distance.BetweenPoints(s, this.lastGhost) >= GHOST_GAP)) {
       this.nextGhost = now + 45;
+      this.lastGhost = { x: s.x, y: s.y };
       const ghost = this.scene.add.image(s.x, s.y, s.texture.key, s.frame.name).setOrigin(0.5, 1).setFlipX(s.flipX).setDepth(s.depth - 0.5)
-        .setTint(SLOWMO.orange).setTintMode(Phaser.TintModes.FILL).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.2 * k);
-      this.scene.tweens.add({ targets: ghost, alpha: 0, duration: 200, onComplete: () => ghost.destroy() });
+        .setTint(bolts ? SLOWMO.orange : SLOWMO.gold).setTintMode(Phaser.TintModes.FILL).setBlendMode(Phaser.BlendModes.ADD).setAlpha((bolts ? 0.2 : 0.5) * k);
+      const ramp = [SLOWMO.gold, SLOWMO.orange, SLOWMO.red];
+      this.scene.tweens.add({
+        targets: ghost, alpha: 0, duration: bolts ? 200 : 380,
+        onUpdate: (tw) => bolts || ghost.setTint(ramp[Math.min(2, Math.floor(tw.progress * 3))]), // stepped, not blended: pixel art
+        onComplete: () => ghost.destroy(),
+      });
     }
   }
 }

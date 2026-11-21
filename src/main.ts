@@ -51,6 +51,7 @@ const { panel, sync } = tuningPanel(tuning, {
   animSpeed: [0.25, 3, 0.05],
   slowmo: [0.05, 1, 0.05],
   slowmoSpeed: [1, 3, 0.1],
+  speedLightning: [0, 1, 1],
   windBase: [0, 1, 0.05],
   windGust: [0, 1, 0.05],
   gustEvery: [1, 20, 0.5],
