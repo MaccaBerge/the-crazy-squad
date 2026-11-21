@@ -38,6 +38,7 @@ const STRESS_BLADES = Number(new URLSearchParams(location.search).get('grass')) 
 const NUDGE_SPEED = 0.6; // corner assist sideways speed, as a share of top speed
 const HURT = 0.18; // seconds a hit pushes you around before your input counts again
 const SPARK = 140; // ms a hit spark lasts
+const FADE_OUT = 120; // ms the slow-mo look takes to fade when it ends
 const SLOW_IN = 0.12; // s for the world to ease down into slow-mo (it snaps back at the end)
 const ATTACK_SLOW = 0.4; // share of walking speed while swinging: you can creep, not run (combat blueprint §3)
 
@@ -107,6 +108,7 @@ export class LevelScene extends Phaser.Scene {
   private readout?: HTMLDivElement;
   private slowmo = false; // Christian's slow-mo is running
   private slow = 1; // world speed now: eases down to tuning.slowmo while slow-mo runs
+  private slowLook = { k: 0, endedAt: -Infinity }; // the look's strength when it ended, so it fades out instead of popping
   private worldT = 0; // s of world time, the clock nature runs on: slowed in slow-mo
   private shade!: Phaser.GameObjects.Rectangle; // darkens the world, but not the lightning drawn above it
   private vignette!: Phaser.Filters.Vignette;
@@ -139,6 +141,7 @@ export class LevelScene extends Phaser.Scene {
     this.frozenUntil = 0;
     this.slowmo = false;
     this.slow = 1;
+    this.slowLook = { k: 0, endedAt: -Infinity };
     this.worldT = 0;
     const { map, layers, colliders } = loadMap(this, MAP);
     const weather = (map.properties as { name: string; value: unknown }[]).find((p) => p.name === 'weather')?.value;
@@ -363,6 +366,7 @@ export class LevelScene extends Phaser.Scene {
   /** Time snaps back (ran out, or swapped out): every saved-up knockback lands at once, and the camera snaps out. */
   private endSlowmo() {
     this.slowmo = false;
+    this.slowLook.endedAt = this.time.now;
     this.slow = 1;
     for (const a of this.party.abilities) a?.end();
     let landed = false;
@@ -528,7 +532,10 @@ export class LevelScene extends Phaser.Scene {
    * The bolts at the screen edges are the HUD's.
    */
   private drawSlowmo(s: CharSprite) {
-    const k = this.slowmo && tuning.slowmo < 1 ? Phaser.Math.Clamp((1 - this.slow) / (1 - tuning.slowmo), 0, 1) : 0;
+    // The world's speed snaps back at once, but the look fades out over FADE_OUT ms so the colour doesn't pop.
+    const look = this.slowLook, k = this.slowmo && tuning.slowmo < 1
+      ? (look.k = Phaser.Math.Clamp((1 - this.slow) / (1 - tuning.slowmo), 0, 1))
+      : look.k * Math.max(0, 1 - (this.time.now - look.endedAt) / FADE_OUT);
     this.shade.setVisible(k > 0);
     this.vignette.setActive(k > 0);
     this.speedFx.update(this.time.now, s, k, { bolts: tuning.speedLightning > 0, gap: tuning.ghostGap, streak: tuning.streak > 0 });
