@@ -3,7 +3,7 @@ import { Health } from '../collision/hits';
 import type { Action } from '../input/actions';
 import { Stamina, type StaminaTuning } from './stamina';
 
-export const SWAP_ACTIONS = ['swapNext', 'swapPrev', 'swap1', 'swap2', 'swap3', 'swap4'] as const satisfies readonly Action[];
+export const SWAP_ACTIONS = ['swap1', 'swap2', 'swap3', 'swap4'] as const satisfies readonly Action[];
 export type SwapAction = (typeof SWAP_ACTIONS)[number];
 export type SwapResult = 'ok' | 'cooldown' | 'same' | 'no-room' | 'downed';
 
@@ -47,8 +47,6 @@ export class Party {
 
   /** The member index a swap action asks for. */
   targetFor(action: SwapAction): number {
-    if (action === 'swapNext') return this.nextStanding(1) ?? this.activeIndex;
-    if (action === 'swapPrev') return this.nextStanding(-1) ?? this.activeIndex;
     return Number(action.slice(4)) - 1;
   }
 

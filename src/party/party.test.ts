@@ -5,11 +5,9 @@ import { defaultStamina } from './stamina';
 
 const fits = () => true;
 
-test('number keys pick a member, E/Q cycle both ways and wraps', () => {
+test('number keys pick a member', () => {
   const p = new Party(SQUAD, { swapCooldown: 0, ...defaultStamina });
   expect(p.targetFor('swap3')).toBe(2);
-  expect(p.targetFor('swapPrev')).toBe(3);
-  expect(p.targetFor('swapNext')).toBe(1);
 });
 
 test('a swap starts the cooldown, which blocks swapping until it runs out', () => {
@@ -42,12 +40,10 @@ test('each member keeps their own stamina, and off-stage members refill', () => 
   expect(p.stamina[0].value).toBeGreaterThan(tired);
 });
 
-test('a downed member can not be swapped to, and E/Q skip them', () => {
+test('a downed member can not be swapped to', () => {
   const p = new Party(SQUAD, { swapCooldown: 0, ...defaultStamina });
   p.health[1].take(999, 0);
   expect(p.trySwap(1, fits)).toBe('downed');
-  expect(p.targetFor('swapNext')).toBe(2);
-  expect(p.targetFor('swapPrev')).toBe(3);
 });
 
 test('going down forces a swap to the next one standing, ignoring the cooldown, until nobody is left', () => {

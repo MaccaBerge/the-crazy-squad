@@ -121,7 +121,7 @@ What it adds then: a network module, `RemoteController`, a snapshot encoder and 
 
 `src/input/actions.ts` lists every action:
 
-`move` (vector), `aim` (vector, optional), `attack`, `ability1`, `ability2`, `interact`, `swapNext`, `swapPrev`, `swapTo1`–`swapTo4`, `pause`.
+`move` (vector), `aim` (vector, optional), `attack`, `ability1`, `ability2`, `interact`, `swapTo1`–`swapTo4`, `pause`.
 
 ### Default bindings
 
@@ -132,10 +132,9 @@ Bindings are data in `src/input/bindings.ts`. They could be made rebindable late
 | move | WASD / arrow keys | Left stick / d-pad |
 | aim | Facing direction (or mouse, later) | Right stick |
 | attack | J or Space | A / Cross |
-| ability1 | K | X / Square |
+| ability1 | E | X / Square |
 | ability2 | L | Y / Triangle |
 | interact | F | B / Circle |
-| swapNext / swapPrev | E / Q | RB / LB |
 | swapTo1–4 | 1, 2, 3, 4 | (none) |
 | pause | Esc / P | Start |
 | tuning panel (dev) | T | (none) |

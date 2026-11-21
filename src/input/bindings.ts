@@ -14,11 +14,9 @@ export const SPRINT_KEYS = ['ShiftLeft', 'ShiftRight'];
 
 export const ACTION_KEYS: Record<Action, string[]> = {
   attack: ['KeyJ', 'Space'],
-  ability1: ['KeyK'],
+  ability1: ['KeyE'],
   ability2: ['KeyL'],
   interact: ['KeyF'],
-  swapNext: ['KeyE'],
-  swapPrev: ['KeyQ'],
   swap1: ['Digit1'],
   swap2: ['Digit2'],
   swap3: ['Digit3'],
