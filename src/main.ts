@@ -49,6 +49,7 @@ const { panel, sync } = tuningPanel(tuning, {
   exhaustTime: [0, 5, 0.1],
   exhaustSlow: [0.2, 1, 0.05],
   animSpeed: [0.25, 3, 0.05],
+  slowmo: [0.05, 1, 0.05],
   windBase: [0, 1, 0.05],
   windGust: [0, 1, 0.05],
   gustEvery: [1, 20, 0.5],

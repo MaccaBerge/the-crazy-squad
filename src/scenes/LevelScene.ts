@@ -29,6 +29,7 @@ import type { Vec } from '../movement';
 import { comboStep, inArc, type Swing, swingPhase } from '../combat/swing';
 import { ringSlots, separation } from '../ai/separation';
 import { HUNTING } from '../ai/dogBrain';
+import { bolt, SLOWMO } from '../abilities/slowmo';
 
 const MAP = new URLSearchParams(location.search).get('map') ?? 'test'; // dev: ?map=backyard
 // Dev: ?grass=20000 covers the map in that many blades, with an fps readout (nature blueprint §8, step 2).
@@ -36,6 +37,7 @@ const STRESS_BLADES = Number(new URLSearchParams(location.search).get('grass')) 
 const NUDGE_SPEED = 0.6; // corner assist sideways speed, as a share of top speed
 const HURT = 0.18; // seconds a hit pushes you around before your input counts again
 const SPARK = 140; // ms a hit spark lasts
+const SLOW_IN = 0.12; // s for the world to ease down into slow-mo (it snaps back at the end)
 const ATTACK_SLOW = 0.4; // share of walking speed while swinging: you can creep, not run (combat blueprint §3)
 
 /** Live-tunable values (T panel). Character stats multiply the movement values. */
@@ -49,6 +51,7 @@ export const tuning = {
   packSpace: 22, packPush: 1.5, // px dogs keep between them, and how hard they steer apart
   warnRange: 160, // px a dog that's after you warns packmates across, even ones that can't see you
   packRing: 18, // px from you to each hunting dog's spot in the ring (inside their reach, so they can still bite)
+  slowmo: 0.3, // world speed during Christian's slow-mo (everything but him)
   ...WEATHER[DEFAULT_WEATHER], // replaced by the map's weather on load
 };
 
@@ -97,6 +100,15 @@ export class LevelScene extends Phaser.Scene {
   private frozenUntil = 0;
   private knock: Vec = { x: 0, y: 0 };
   private readout?: HTMLDivElement;
+  private slowmo = false; // Christian's slow-mo is running
+  private slow = 1; // world speed now: eases down to tuning.slowmo while slow-mo runs
+  private worldT = 0; // s of world time, the clock nature runs on: slowed in slow-mo
+  private grade!: Phaser.Filters.ColorMatrix;
+  private vignette!: Phaser.Filters.Vignette;
+  private baseZoom = 1;
+  private nextGhost = 0;
+  private crackle: Vec[][] = []; // little bolts round Christian, relative to his chest
+  private nextCrackle = 0;
 
   constructor() {
     super('level');
@@ -122,6 +134,9 @@ export class LevelScene extends Phaser.Scene {
     this.combo = { step: -1, since: 0 };
     this.sparks = [];
     this.frozenUntil = 0;
+    this.slowmo = false;
+    this.slow = 1;
+    this.worldT = 0;
     const { map, layers, colliders } = loadMap(this, MAP);
     const weather = (map.properties as { name: string; value: unknown }[]).find((p) => p.name === 'weather')?.value;
     Object.assign(tuning, WEATHER[isWeather(weather) ? weather : DEFAULT_WEATHER]);
@@ -202,6 +217,10 @@ export class LevelScene extends Phaser.Scene {
 
     // Dev: the mouse wheel or -/+ zooms the view out and in, 0 resets. For testing only: below 1× the pixels shimmer.
     const cam = this.cameras.main;
+    // Slow-mo's look: colour drains and the edges darken. Off until it runs (cleared first: a restart reuses the camera).
+    cam.filters.internal.clear();
+    this.grade = cam.filters.internal.addColorMatrix().setActive(false);
+    this.vignette = cam.filters.internal.addVignette(0.5, 0.5, 0.8, 0).setActive(false);
     const zoomTo = (z: number) => cam.setZoom(Phaser.Math.Clamp(z, 0.25, 3));
     this.input.on('wheel', (_p: unknown, _o: unknown, _dx: number, dy: number) => zoomTo(cam.zoom * Math.exp(-dy * 0.002))); // smooth on trackpads too
     this.input.keyboard!.on('keydown-MINUS', () => zoomTo(cam.zoom / 1.25));
@@ -229,6 +248,15 @@ export class LevelScene extends Phaser.Scene {
     this.sprinting = this.party.tick(dt, intent.sprint && moving);
     const swap = SWAP_ACTIONS.find((a) => intent.pressed.has(a));
     if (swap) this.trySwap(swap);
+    const ability = this.party.abilities[this.party.activeIndex];
+    // A press on the cooldown stays buffered, like swapping; one with no ability to use is dropped.
+    if (intent.pressed.has('ability1') && (!ability || ability.start())) {
+      this.controller.consume('ability1');
+      if (ability?.def.id === 'slowmo') this.startSlowmo();
+    }
+    if (this.slowmo && !this.party.abilities.some((a) => a?.active)) this.endSlowmo();
+    this.slow = this.slowmo ? this.slow + (tuning.slowmo - this.slow) * Math.min(1, dt / SLOW_IN) : 1;
+    for (const d of this.brains) d.timeScale = this.slow;
 
     const s = this.active;
     const pack = this.brains.filter((d) => !d.out), feet = pack.map((d) => d.sprite);
@@ -316,6 +344,35 @@ export class LevelScene extends Phaser.Scene {
     world.pause(); // update() resumes it
   }
 
+  /** Christian's slow-mo starts: a beat of freeze, then the camera pushes in while the world winds down. */
+  private startSlowmo() {
+    this.slowmo = true;
+    this.freeze(80);
+    const cam = this.cameras.main;
+    this.tweens.killTweensOf(cam);
+    this.baseZoom = cam.zoom;
+    this.tweens.add({ targets: cam, zoom: this.baseZoom * SLOWMO.zoom, duration: 250, ease: 'Cubic.Out' });
+  }
+
+  /** Time snaps back (ran out, or swapped out): every saved-up knockback lands at once, and the camera snaps out. */
+  private endSlowmo() {
+    this.slowmo = false;
+    this.slow = 1;
+    for (const a of this.party.abilities) a?.end();
+    let landed = false;
+    for (const d of this.brains) {
+      d.timeScale = 1;
+      if (!d.release()) continue;
+      landed = true;
+      this.sparks.push({ x: d.sprite.x, y: d.sprite.y - 10, at: this.time.now, big: true });
+    }
+    const cam = this.cameras.main;
+    this.tweens.killTweensOf(cam);
+    this.tweens.add({ targets: cam, zoom: this.baseZoom, duration: 160, ease: 'Cubic.In' });
+    cam.shake(landed ? 160 : 100, landed ? 0.008 : 0.004);
+    if (landed) this.freeze(tuning.heavyHitstop);
+  }
+
   /** Dev spawn: the next breed, on the first free spot about 4 tiles from you. */
   private spawnDog() {
     const kind = DOG_KINDS[this.spawned++ % DOG_KINDS.length], breed = BREEDS[kind];
@@ -358,6 +415,7 @@ export class LevelScene extends Phaser.Scene {
     const to = this.active;
     const { x: vx, y: vy } = from.body.velocity;
     this.swing = undefined; // swapping cancels whatever the old one was doing
+    if (this.slowmo) this.endSlowmo(); // slow-mo is Christian's alone
     this.combo = { step: -1, since: 0 };
     offStage(from);
     onStage(to, from.x, from.y);
@@ -408,6 +466,8 @@ export class LevelScene extends Phaser.Scene {
       this.physics.world.resume();
     }
     const s = this.active;
+    this.worldT += (delta / 1000) * this.slow;
+    const worldDt = Math.min(delta / 1000, 0.05) * this.slow;
     s.setDepth(DEPTH.actors + s.y); // y-sort by feet
     // Invincibility frames show as flicker.
     s.setAlpha(this.party.health[this.party.activeIndex].invulnerable && Math.floor(this.time.now / 60) % 2 ? 0.3 : 1);
@@ -435,20 +495,56 @@ export class LevelScene extends Phaser.Scene {
     this.rig.update(s.body.velocity, this.moveParams(this.party.active, this.sprinting).maxSpeed, delta / 1000);
     this.drawStamina(s, delta / 1000);
     this.drawSwing(s);
+    this.drawSlowmo(s);
     if (this.windView.visible) this.drawWind();
-    this.trees.update(this.time.now / 1000, delta / 1000, tuning, s);
-    this.leaves.update(this.time.now / 1000, Math.min(delta / 1000, 0.05), tuning);
-    this.hanging.update(this.time.now / 1000, Math.min(delta / 1000, 0.05), tuning);
+    this.trees.update(this.worldT, (delta / 1000) * this.slow, tuning, s);
+    this.leaves.update(this.worldT, worldDt, tuning);
+    this.hanging.update(this.worldT, worldDt, tuning);
     this.look.update(Math.min(delta / 1000, 0.05), tuning.light);
     this.dogs.face(this.active.x, this.active.y - 8);
     for (const d of this.brains) d.update(this.time.now, this.physics.world.drawDebug);
     if (this.grass) {
       const start = performance.now();
       const forces = [footForce(s.x, s.y, this.party.active.body.w)];
-      const changed = this.grass.update(this.cameras.main.worldView, this.time.now / 1000, delta / 1000, tuning, forces);
+      const changed = this.grass.update(this.cameras.main.worldView, this.worldT, (delta / 1000) * this.slow, tuning, forces);
       const ms = performance.now() - start;
       if (this.readout && this.game.getFrame() % 30 === 0)
         this.readout.textContent = `${STRESS_BLADES} blades · ${this.grass.pushed} pushed · ${changed} re-posed in ${ms.toFixed(2)} ms · ${this.game.loop.actualFps.toFixed(0)} fps`;
+    }
+  }
+
+  /**
+   * Slow-mo on screen: the colour grade and vignette follow how far the world has slowed, Christian leaves fading
+   * afterimages while he moves, and small bolts crackle round him. The bolts at the screen edges are the HUD's.
+   */
+  private drawSlowmo(s: CharSprite) {
+    const k = this.slowmo && tuning.slowmo < 1 ? Phaser.Math.Clamp((1 - this.slow) / (1 - tuning.slowmo), 0, 1) : 0;
+    this.grade.setActive(k > 0);
+    this.vignette.setActive(k > 0);
+    if (!k) return;
+    const [r, g, b] = SLOWMO.tint.map((c) => 1 + (c - 1) * k);
+    this.grade.colorMatrix.saturate(-SLOWMO.desaturate * k).multiply([r, 0, 0, 0, 0, 0, g, 0, 0, 0, 0, 0, b, 0, 0, 0, 0, 0, 1, 0], true);
+    this.vignette.strength = SLOWMO.vignette * k;
+
+    const now = this.time.now;
+    if (s.body.velocity.length() > 10 && now >= this.nextGhost) {
+      this.nextGhost = now + 40;
+      const ghost = this.add.image(s.x, s.y, s.texture.key, s.frame.name).setOrigin(0.5, 1).setFlipX(s.flipX).setDepth(s.depth - 0.5)
+        .setTint(SLOWMO.glow).setTintMode(Phaser.TintModes.FILL).setAlpha(0.45);
+      this.tweens.add({ targets: ghost, alpha: 0, duration: 220, onComplete: () => ghost.destroy() });
+    }
+    if (now >= this.nextCrackle) {
+      this.nextCrackle = now + 70;
+      // Short arcs round his body, about half the time, so it flickers instead of glowing steadily.
+      this.crackle = Math.random() < 0.55 ? [0, 1].map(() => {
+        const a = Math.random() * Math.PI * 2, rad = 6 + Math.random() * 4, at = (t: number, d: number) => ({ x: Math.cos(t) * d, y: Math.sin(t) * d * 1.4 });
+        return bolt(at(a, rad), at(a + 0.9, rad + 3), 3, 2);
+      }) : [];
+    }
+    const fx = this.swingFx;
+    for (const line of this.crackle) {
+      const pts = line.map((p) => ({ x: Math.round(s.x + p.x), y: Math.round(s.y - 12 + p.y) }));
+      fx.lineStyle(1, Math.random() < 0.5 ? SLOWMO.core : SLOWMO.glow, 0.9).strokePoints(pts as Phaser.Math.Vector2[]); // only reads x and y
     }
   }
 

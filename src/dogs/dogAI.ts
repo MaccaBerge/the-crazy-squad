@@ -26,6 +26,7 @@ const KNOCK = 0.15; // s a hit pushes the dog around
 const FLASH = 0.06; // s of white after a hit
 const DIZZY = 0.6; // s of spinning with stars when knocked out, before the poof
 const POOF = 0.25; // s of the poof
+const HELD_MAX = 400; // px/s cap on knockback saved up during slow-mo, so a long combo doesn't fling a dog off the map
 
 /**
  * One thinking dog (dog AI blueprint §11): the brain decides, this turns it into movement, animation and the hit.
@@ -54,6 +55,10 @@ export class DogAI {
   private knock: Vec = { x: 0, y: 0 };
   private knockT = 0;
   private flashT = 0;
+  /** World speed for this dog: 1 normal, below 1 in slow-mo. Its movement, timers and animation all run this much slower. */
+  timeScale = 1;
+  /** Knockback from hits in slow-mo, saved until time snaps back (release). */
+  private held: Vec = { x: 0, y: 0 };
   /** Seconds since being knocked out, or -1 while still in the fight. */
   private ko = -1;
 
@@ -84,8 +89,13 @@ export class DogAI {
   takeHit(damage: number, push: Vec) {
     if (this.out || !this.health.take(damage, IFRAMES)) return false;
     const w = this.breed.weight;
-    this.knock = { x: push.x * w, y: push.y * w };
-    this.knockT = KNOCK;
+    if (this.timeScale < 1) {
+      const x = this.held.x + push.x * w, y = this.held.y + push.y * w, k = Math.min(1, HELD_MAX / (Math.hypot(x, y) || 1));
+      this.held = { x: x * k, y: y * k };
+    } else {
+      this.knock = { x: push.x * w, y: push.y * w };
+      this.knockT = KNOCK;
+    }
     this.flashT = FLASH;
     hurt(this.brain, Math.hypot(push.x, push.y) >= this.breed.poise);
     if (this.health.down) {
@@ -93,6 +103,17 @@ export class DogAI {
       this.ko = 0;
       this.sprite.disableBody(false, false);
     }
+    return true;
+  }
+
+  /** Slow-mo ended: all the knockback saved up lands at once. Returns whether there was any. */
+  release() {
+    const { x, y } = this.held;
+    this.held = { x: 0, y: 0 };
+    if (this.out || Math.hypot(x, y) < 1) return false;
+    this.knock = { x, y };
+    this.knockT = KNOCK;
+    this.flashT = FLASH;
     return true;
   }
 
@@ -104,8 +125,11 @@ export class DogAI {
    */
   step(dt: number, target: { x: number; y: number } | undefined, t: DogTuning, onHit: (push: Vec, damage: number) => void, { crowd = { x: 0, y: 0 }, slot, told = false }: { crowd?: Vec; slot?: Vec; told?: boolean } = {}) {
     const s = this.sprite, b = this.breed;
+    // Hit immunity and the hit flash stay in real time, so Christian's fast combos still connect in slow-mo.
     this.health.tick(dt);
     this.flashT = Math.max(0, this.flashT - dt);
+    const ts = this.timeScale;
+    dt *= ts;
     if (this.out) return void (this.ko += dt);
     const to = target && { x: target.x - s.x, y: target.y - s.y };
     const dist = to ? Math.hypot(to.x, to.y) : null;
@@ -132,8 +156,8 @@ export class DogAI {
     move = { x: move.x + apart.x, y: move.y + apart.y };
     const p = { maxSpeed: t.walkSpeed * b.speed, accel: t.accel * b.accel, decel: t.decel * b.accel };
     const v = this.knockT > 0 ? (this.knockT = Math.max(0, this.knockT - dt), { x: this.knock.x * (this.knockT / KNOCK), y: this.knock.y * (this.knockT / KNOCK) })
-      : state === 'attack' ? { x: this.aim.x * b.lunge.speed + apart.x * p.maxSpeed, y: this.aim.y * b.lunge.speed + apart.y * p.maxSpeed } : stepVelocity(s.body.velocity, move, dt, p);
-    s.body.setVelocity(v.x, v.y);
+      : state === 'attack' ? { x: this.aim.x * b.lunge.speed + apart.x * p.maxSpeed, y: this.aim.y * b.lunge.speed + apart.y * p.maxSpeed } : stepVelocity({ x: s.body.velocity.x / ts, y: s.body.velocity.y / ts }, move, dt, p);
+    s.body.setVelocity(v.x * ts, v.y * ts); // the body moves in real time, so slow-mo scales its speed
     this.dir = snapDir(this.dir, heading ? move : state === 'idle' || state === 'lost' ? { x: 0, y: 0 } : this.aim);
 
     if (state === 'attack' && !this.landed && target) {
@@ -178,7 +202,7 @@ export class DogAI {
     }
     s.setFlipX(flip);
     if (this.scene.anims.exists(key)) s.play(key, true);
-    s.anims.timeScale = anim === 'walk' ? Phaser.Math.Clamp(speed / 50, 0.5, 2) : 1;
+    s.anims.timeScale = (anim === 'walk' ? Phaser.Math.Clamp(speed / this.timeScale / 50, 0.5, 2) : 1) * this.timeScale;
 
     // Windup telegraph: flash white, faster as the hit gets close.
     const t = this.brain.t, w = this.breed.brain.windup;
