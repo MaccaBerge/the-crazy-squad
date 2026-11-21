@@ -1,0 +1,94 @@
+import * as Phaser from 'phaser';
+import type { Vec } from '../movement';
+import { DEPTH } from '../world/constants';
+import { drawLightning, type Lightning, lightning, SLOWMO } from './slowmo';
+
+const TRAIL_MS = 600; // how far back the lightning trail reaches
+const ARC_EVERY = 30; // ms between new arcs off the body
+const LIGHT = 'speed-light';
+type Sprite = Phaser.GameObjects.Sprite & { body: Phaser.Physics.Arcade.Body };
+type Arc = { l: Lightning; born: number; life: number };
+
+/**
+ * Christian's slow-mo, on him: arcs of lightning crackling off his body and swept back as he runs, a trail of live
+ * lightning strands along his path, glowing afterimages, and warm orange light round him that lights up the ground.
+ * Everything is in the suit colours and drawn additively, so it reads as light, not paint.
+ */
+export class SpeedFx {
+  private glow: Phaser.GameObjects.Graphics;
+  private core: Phaser.GameObjects.Graphics;
+  private light: Phaser.GameObjects.Image;
+  private trail: (Vec & { t: number })[] = [];
+  private arcs: Arc[] = []; // relative to his chest, so they ride along with him
+  private nextArc = 0;
+  private nextGhost = 0;
+
+  constructor(private scene: Phaser.Scene) {
+    this.glow = scene.add.graphics().setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.effects + 1);
+    this.core = scene.add.graphics().setDepth(DEPTH.effects + 2);
+    if (!scene.textures.exists(LIGHT)) {
+      // A round light in a few hard steps instead of a smooth gradient: it scales up into chunky pixel rings.
+      const tex = scene.textures.createCanvas(LIGHT, 32, 32)!, ctx = tex.getContext();
+      for (const [r, a] of [[16, 0.12], [13, 0.22], [10, 0.35], [7, 0.55], [4, 0.8]]) {
+        ctx.fillStyle = `rgba(255,255,255,${a})`;
+        ctx.beginPath(), ctx.arc(16, 16, r, 0, Math.PI * 2), ctx.fill();
+      }
+      tex.refresh();
+    }
+    this.light = scene.add.image(0, 0, LIGHT).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.effects - 2.75).setScale(3.5).setTint(SLOWMO.orange).setVisible(false);
+  }
+
+  /** Per rendered frame. `k` is how strong slow-mo is right now (0 off, 1 full). */
+  update(now: number, s: Sprite, k: number) {
+    const glow = this.glow.clear(), core = this.core.clear();
+    if (k <= 0) {
+      this.light.setVisible(false);
+      this.trail = [];
+      this.arcs = [];
+      return;
+    }
+    const v = s.body.velocity, speed = v.length(), moving = speed > 10, chest = { x: s.x, y: s.y - 13 };
+    const back = moving ? { x: -v.x / speed, y: -v.y / speed } : { x: 0, y: 0 };
+
+    // Warm light round him, flickering with the electricity.
+    this.light.setVisible(true).setPosition(chest.x, chest.y).setAlpha(k * (0.5 + 0.12 * Math.sin(now / 45) + Math.random() * 0.1));
+
+    // Trail: live strands of lightning along where he just ran, re-jagged every frame so they writhe, fading behind.
+    if (moving) this.trail.push({ x: chest.x, y: chest.y, t: now });
+    this.trail = this.trail.filter((p) => now - p.t < TRAIL_MS);
+    if (this.trail.length > 3) {
+      const pts = this.trail.filter((_, i) => i % 3 === 0 || i === this.trail.length - 1);
+      for (let strand = 0; strand < 3; strand++) {
+        for (let i = 1; i < pts.length; i++) {
+          const a = pts[i - 1], b = pts[i], fade = 1 - (now - a.t) / TRAIL_MS;
+          const w = (p: Vec, j: number) => ({ x: p.x + (Math.random() * 2 - 1) * 4 * (1 - j * 0.5), y: p.y + (strand - 1) * 4 + (Math.random() * 2 - 1) * 4 });
+          drawLightning(glow, core, lightning(w(a, 0), w(b, 1), { depth: 2, jag: 0.35, fork: 0.1 }), k * fade * (strand === 1 ? 1 : 0.75));
+        }
+      }
+    }
+
+    // Arcs off his body: they start on him and reach out, swept behind him when he runs. Each lives a few frames.
+    if (now >= this.nextArc) {
+      this.nextArc = now + ARC_EVERY;
+      for (let n = 0; n < 2; n++) {
+        const from = { x: (Math.random() * 2 - 1) * 5, y: (Math.random() * 2 - 1) * 10 };
+        const ang = Math.random() * Math.PI * 2, reach = 7 + Math.random() * 11;
+        const to = { x: from.x + Math.cos(ang) * reach + back.x * 12, y: from.y + Math.sin(ang) * reach * 1.3 + back.y * 12 };
+        this.arcs.push({ l: lightning(from, to, { depth: 3, jag: 0.3, fork: 0.2 }), born: now, life: 60 + Math.random() * 80 });
+      }
+    }
+    this.arcs = this.arcs.filter((a) => now - a.born < a.life);
+    for (const a of this.arcs) {
+      const flick = Math.random() < 0.15 ? 0.3 : 1; // the odd frame dims, so it crackles
+      drawLightning(glow, core, a.l, k * flick * (1 - (now - a.born) / a.life), { at: chest });
+    }
+
+    // Afterimages: additive orange copies of him that fade fast, under the lightning.
+    if (moving && now >= this.nextGhost) {
+      this.nextGhost = now + 45;
+      const ghost = this.scene.add.image(s.x, s.y, s.texture.key, s.frame.name).setOrigin(0.5, 1).setFlipX(s.flipX).setDepth(s.depth - 0.5)
+        .setTint(SLOWMO.orange).setTintMode(Phaser.TintModes.FILL).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.4 * k);
+      this.scene.tweens.add({ targets: ghost, alpha: 0, duration: 200, onComplete: () => ghost.destroy() });
+    }
+  }
+}

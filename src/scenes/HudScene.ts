@@ -1,8 +1,7 @@
 import * as Phaser from 'phaser';
 import { characterTexture, FRAME } from '../art/placeholders';
 import type { Party } from '../party/party';
-import { bolt, SLOWMO } from '../abilities/slowmo';
-import type { Vec } from '../movement';
+import { drawLightning, type Lightning, lightning, SLOWMO } from '../abilities/slowmo';
 
 const GAP = 4;
 const MARGIN = 4;
@@ -43,9 +42,10 @@ export class HudScene extends Phaser.Scene {
   private gfx!: Phaser.GameObjects.Graphics;
   private bars!: Phaser.GameObjects.Graphics; // over the portraits
   private root!: Phaser.GameObjects.Container;
-  private edges!: Phaser.GameObjects.Graphics; // slow-mo lightning round the screen, under the panel
-  private bolts: Vec[][] = [];
-  private nextBolts = 0;
+  private edgeGlow!: Phaser.GameObjects.Graphics; // slow-mo lightning round the screen, under the panel: additive glow…
+  private edgeCore!: Phaser.GameObjects.Graphics; // …and the bright cores on top
+  private strikes: { l: Lightning; born: number; life: number; thick: number }[] = [];
+  private nextStrike = 0;
   private wasReady = true;
   private readyAt = -Infinity;
 
@@ -59,7 +59,8 @@ export class HudScene extends Phaser.Scene {
 
   create() {
     // Everything sits in one container pinned to the bottom-left corner, whatever the screen size.
-    this.edges = this.add.graphics();
+    this.edgeGlow = this.add.graphics().setBlendMode(Phaser.BlendModes.ADD);
+    this.edgeCore = this.add.graphics();
     this.gfx = this.add.graphics();
     const labels = this.add.graphics();
     this.root = this.add.container(0, 0, [this.gfx, labels]);
@@ -98,7 +99,7 @@ export class HudScene extends Phaser.Scene {
       p.setAlpha(down ? 0.2 : i === activeIndex || cooldownLeft === 0 ? 1 : 0.4);
       // A dot in the corner for members with an ability: lit when it's ready, so you know when swapping to them pays.
       const a = this.party.abilities[i];
-      if (a && !down) b.fillStyle(0x241520).fillRect(x + FRAME - 5, 1, 4, 4).fillStyle(a.ready ? SLOWMO.glow : 0x6b5a5a).fillRect(x + FRAME - 4, 2, 2, 2);
+      if (a && !down) b.fillStyle(0x241520).fillRect(x + FRAME - 5, 1, 4, 4).fillStyle(a.ready ? SLOWMO.gold : 0x6b5a5a).fillRect(x + FRAME - 4, 2, 2, 2);
     });
     if (ability) this.drawSlot(b, width + GAP, ability);
     this.drawEdges(this.party.abilities.find((a) => a?.active && a.def.id === 'slowmo')?.left ?? 0);
@@ -115,7 +116,7 @@ export class HudScene extends Phaser.Scene {
     drawDigit(g, 'E', x + SLOT / 2 - 1, -8);
     g.fillStyle(0x241520).fillRect(x, y, SLOT, SLOT);
     const cooling = a.cooldownLeft > 0;
-    drawPattern(g, ICON, x + 6, y + 3, cooling ? { '#': 0x6b5a5a, o: 0x8a7a7a } : { '#': SLOWMO.glow, o: SLOWMO.core });
+    drawPattern(g, ICON, x + 6, y + 3, cooling ? { '#': 0x6b5a5a, o: 0x8a7a7a } : { '#': SLOWMO.gold, o: SLOWMO.core });
     if (cooling) {
       const h = Math.ceil((SLOT - 2) * a.cooldownFraction);
       g.fillStyle(0x000000, 0.55).fillRect(x + 1, y + 1, SLOT - 2, h);
@@ -123,37 +124,39 @@ export class HudScene extends Phaser.Scene {
       [...secs].forEach((d, i) => drawDigit(g, d, x + SLOT / 2 - secs.length * 2 + i * 4, y + SLOT / 2 - 2));
     }
     if (a.active) {
-      g.fillStyle(SLOWMO.glow).fillRect(x + 1, y + SLOT - 3, Math.max(1, Math.round((SLOT - 2) * (a.left / a.def.duration))), 2);
+      g.fillStyle(SLOWMO.gold).fillRect(x + 1, y + SLOT - 3, Math.max(1, Math.round((SLOT - 2) * (a.left / a.def.duration))), 2);
     }
     const flash = 1 - (now - this.readyAt) / READY_FLASH;
     if (flash > 0) g.fillStyle(SLOWMO.core, flash * 0.8).fillRect(x + 1, y + 1, SLOT - 2, SLOT - 2);
-    g.lineStyle(1, a.ready || a.active ? SLOWMO.glow : 0x6b5a5a).strokeRect(x - 0.5, y - 0.5, SLOT + 1, SLOT + 1);
+    g.lineStyle(1, a.ready || a.active ? SLOWMO.gold : 0x6b5a5a).strokeRect(x - 0.5, y - 0.5, SLOT + 1, SLOT + 1);
   }
 
   /**
-   * Slow-mo: lightning crackling along the screen edges, redrawn every few frames so it flickers. `left` is the
-   * seconds of slow-mo left (0: off); in the last second it stutters, a warning that time is about to snap back.
+   * Slow-mo: lightning round the screen edges. Bolts strike in from the edge or crawl along it, branch, live a few
+   * frames and flicker out, a new one every few frames, now and then a big one. `left` is the seconds of slow-mo left
+   * (0: off); in the last second it stutters, a warning that time is about to snap back.
    */
   private drawEdges(left: number) {
-    const g = this.edges.clear(), now = this.time.now;
-    if (left <= 0 || (left < 1 && Math.floor(now / 70) % 3 === 0)) return;
+    const glow = this.edgeGlow.clear(), core = this.edgeCore.clear(), now = this.time.now;
+    if (left <= 0) return void (this.strikes = []);
     const w = this.scale.width, h = this.scale.height;
-    if (now >= this.nextBolts) {
-      this.nextBolts = now + 60;
-      // Each bolt runs a short way along one edge, a few px in from it.
-      const edge = (i: number): [Vec, Vec] => {
-        const t = Math.random(), len = 30 + Math.random() * 50, d = 2 + Math.random() * 6;
-        if (i % 4 === 0) return [{ x: t * w, y: d }, { x: t * w + len, y: d + Math.random() * 8 }];
-        if (i % 4 === 1) return [{ x: t * w, y: h - d }, { x: t * w + len, y: h - d - Math.random() * 8 }];
-        if (i % 4 === 2) return [{ x: d, y: t * h }, { x: d + Math.random() * 8, y: t * h + len }];
-        return [{ x: w - d, y: t * h }, { x: w - d - Math.random() * 8, y: t * h + len }];
-      };
-      this.bolts = Array.from({ length: 8 }, (_, i) => bolt(...edge(i + Math.floor(Math.random() * 4)), 7, 4));
+    if (now >= this.nextStrike) {
+      this.nextStrike = now + 35 + Math.random() * 40;
+      const side = Math.floor(Math.random() * 4), t = Math.random(), big = Math.random() < 0.12;
+      // A point on that edge, the way into the screen from it, and the way along it.
+      const at = [{ x: t * w, y: 0 }, { x: w, y: t * h }, { x: t * w, y: h }, { x: 0, y: t * h }][side];
+      const inward = [{ x: 0, y: 1 }, { x: -1, y: 0 }, { x: 0, y: -1 }, { x: 1, y: 0 }][side], along = { x: -inward.y, y: inward.x };
+      const crawl = !big && Math.random() < 0.45, len = big ? 70 + Math.random() * 50 : 25 + Math.random() * 45;
+      const sway = (Math.random() * 2 - 1) * 0.6, dir = crawl ? along : { x: inward.x + along.x * sway, y: inward.y + along.y * sway };
+      const from = crawl ? { x: at.x + inward.x * (2 + Math.random() * 5), y: at.y + inward.y * (2 + Math.random() * 5) } : at;
+      const to = { x: from.x + dir.x * len, y: from.y + dir.y * len };
+      this.strikes.push({ l: lightning(from, to, { depth: big ? 5 : 4, jag: crawl ? 0.12 : 0.22, fork: big ? 0.3 : 0.18 }), born: now, life: (big ? 160 : 80) + Math.random() * 100, thick: big ? 2 : 1 });
     }
-    for (const line of this.bolts) {
-      const pts = line.map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) })) as Phaser.Math.Vector2[]; // only reads x and y
-      g.lineStyle(3, SLOWMO.glow, 0.35).strokePoints(pts);
-      g.lineStyle(1, SLOWMO.core, 0.95).strokePoints(pts);
+    this.strikes = this.strikes.filter((b) => now - b.born < b.life);
+    if (left < 1 && Math.floor(now / 70) % 3 === 0) return;
+    for (const b of this.strikes) {
+      const age = (now - b.born) / b.life, flick = Math.random() < 0.2 ? 0.35 : 1;
+      drawLightning(glow, core, b.l, flick * (age < 0.15 ? 1 : 1 - (age - 0.15) / 0.85), { thick: b.thick });
     }
   }
 }

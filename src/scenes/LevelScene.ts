@@ -29,7 +29,8 @@ import type { Vec } from '../movement';
 import { comboStep, inArc, type Swing, swingPhase } from '../combat/swing';
 import { ringSlots, separation } from '../ai/separation';
 import { HUNTING } from '../ai/dogBrain';
-import { bolt, SLOWMO } from '../abilities/slowmo';
+import { SLOWMO } from '../abilities/slowmo';
+import { SpeedFx } from '../abilities/speedFx';
 
 const MAP = new URLSearchParams(location.search).get('map') ?? 'test'; // dev: ?map=backyard
 // Dev: ?grass=20000 covers the map in that many blades, with an fps readout (nature blueprint §8, step 2).
@@ -103,12 +104,10 @@ export class LevelScene extends Phaser.Scene {
   private slowmo = false; // Christian's slow-mo is running
   private slow = 1; // world speed now: eases down to tuning.slowmo while slow-mo runs
   private worldT = 0; // s of world time, the clock nature runs on: slowed in slow-mo
-  private grade!: Phaser.Filters.ColorMatrix;
+  private shade!: Phaser.GameObjects.Rectangle; // darkens the world, but not the lightning drawn above it
   private vignette!: Phaser.Filters.Vignette;
   private baseZoom = 1;
-  private nextGhost = 0;
-  private crackle: Vec[][] = []; // little bolts round Christian, relative to his chest
-  private nextCrackle = 0;
+  private speedFx!: SpeedFx;
 
   constructor() {
     super('level');
@@ -217,10 +216,12 @@ export class LevelScene extends Phaser.Scene {
 
     // Dev: the mouse wheel or -/+ zooms the view out and in, 0 resets. For testing only: below 1× the pixels shimmer.
     const cam = this.cameras.main;
-    // Slow-mo's look: colour drains and the edges darken. Off until it runs (cleared first: a restart reuses the camera).
+    this.speedFx = new SpeedFx(this);
+    // Slow-mo's look: the world darkens under the lightning and the screen edges glow orange. Off until it runs
+    // (filters cleared first: a restart reuses the camera).
+    this.shade = this.add.rectangle(0, 0, 1, 1, 0xffffff).setOrigin(0).setDepth(DEPTH.effects - 3).setBlendMode(Phaser.BlendModes.MULTIPLY).setVisible(false);
     cam.filters.internal.clear();
-    this.grade = cam.filters.internal.addColorMatrix().setActive(false);
-    this.vignette = cam.filters.internal.addVignette(0.5, 0.5, 0.8, 0, SLOWMO.edge).setActive(false);
+    this.vignette = cam.filters.internal.addVignette(0.5, 0.5, 0.9, 0, SLOWMO.orange, Phaser.BlendModes.ADD).setActive(false);
     const zoomTo = (z: number) => cam.setZoom(Phaser.Math.Clamp(z, 0.25, 3));
     this.input.on('wheel', (_p: unknown, _o: unknown, _dx: number, dy: number) => zoomTo(cam.zoom * Math.exp(-dy * 0.002))); // smooth on trackpads too
     this.input.keyboard!.on('keydown-MINUS', () => zoomTo(cam.zoom / 1.25));
@@ -468,7 +469,9 @@ export class LevelScene extends Phaser.Scene {
     const s = this.active;
     this.worldT += (delta / 1000) * this.slow;
     const worldDt = Math.min(delta / 1000, 0.05) * this.slow;
-    s.setDepth(DEPTH.actors + s.y); // y-sort by feet
+    // y-sort by feet. In slow-mo he's lifted over the darkening and his own light (SpeedFx), so he stays in full colour.
+    // shortcut: that also draws him over tree tops and roofs while it lasts; sort him under Above if it shows.
+    s.setDepth(this.slowmo ? DEPTH.effects - 2.5 : DEPTH.actors + s.y);
     // Invincibility frames show as flicker.
     s.setAlpha(this.party.health[this.party.activeIndex].invulnerable && Math.floor(this.time.now / 60) % 2 ? 0.3 : 1);
     const { sprite } = this.party.active;
@@ -514,38 +517,19 @@ export class LevelScene extends Phaser.Scene {
   }
 
   /**
-   * Slow-mo on screen: the colour grade and vignette follow how far the world has slowed, Christian leaves fading
-   * afterimages while he moves, and small bolts crackle round him. The bolts at the screen edges are the HUD's.
+   * Slow-mo on screen: the world darkens to a warm dusk under the lightning so it blazes, the screen edges glow orange, and
+   * SpeedFx puts the lightning, trail and light on Christian. All of it follows how far the world has slowed.
+   * The bolts at the screen edges are the HUD's.
    */
   private drawSlowmo(s: CharSprite) {
     const k = this.slowmo && tuning.slowmo < 1 ? Phaser.Math.Clamp((1 - this.slow) / (1 - tuning.slowmo), 0, 1) : 0;
-    this.grade.setActive(k > 0);
+    this.shade.setVisible(k > 0);
     this.vignette.setActive(k > 0);
+    this.speedFx.update(this.time.now, s, k);
     if (!k) return;
-    const [r, g, b] = SLOWMO.tint.map((c) => 1 + (c - 1) * k);
-    this.grade.colorMatrix.saturate(-SLOWMO.desaturate * k).multiply([r, 0, 0, 0, 0, 0, g, 0, 0, 0, 0, 0, b, 0, 0, 0, 0, 0, 1, 0], true);
-    this.vignette.strength = SLOWMO.vignette * k;
-
-    const now = this.time.now;
-    if (s.body.velocity.length() > 10 && now >= this.nextGhost) {
-      this.nextGhost = now + 40;
-      const ghost = this.add.image(s.x, s.y, s.texture.key, s.frame.name).setOrigin(0.5, 1).setFlipX(s.flipX).setDepth(s.depth - 0.5)
-        .setTint(SLOWMO.ghost).setTintMode(Phaser.TintModes.FILL).setAlpha(0.45);
-      this.tweens.add({ targets: ghost, alpha: 0, duration: 220, onComplete: () => ghost.destroy() });
-    }
-    if (now >= this.nextCrackle) {
-      this.nextCrackle = now + 70;
-      // Short arcs round his body, about half the time, so it flickers instead of glowing steadily.
-      this.crackle = Math.random() < 0.55 ? [0, 1].map(() => {
-        const a = Math.random() * Math.PI * 2, rad = 6 + Math.random() * 4, at = (t: number, d: number) => ({ x: Math.cos(t) * d, y: Math.sin(t) * d * 1.4 });
-        return bolt(at(a, rad), at(a + 0.9, rad + 3), 3, 2);
-      }) : [];
-    }
-    const fx = this.swingFx;
-    for (const line of this.crackle) {
-      const pts = line.map((p) => ({ x: Math.round(s.x + p.x), y: Math.round(s.y - 12 + p.y) }));
-      fx.lineStyle(1, Math.random() < 0.5 ? SLOWMO.core : SLOWMO.glow, 0.9).strokePoints(pts as Phaser.Math.Vector2[]); // only reads x and y
-    }
+    const view = this.cameras.main.worldView, c = Phaser.Display.Color.Interpolate.ColorWithColor(Phaser.Display.Color.ValueToColor(0xffffff), Phaser.Display.Color.ValueToColor(SLOWMO.shade), 1, k);
+    this.shade.setPosition(view.x - 8, view.y - 8).setSize(view.width + 16, view.height + 16).setFillStyle(Phaser.Display.Color.GetColor(c.r, c.g, c.b));
+    this.vignette.strength = SLOWMO.edgeGlow * k * (0.85 + 0.15 * Math.sin(this.time.now / 60)); // pulses
   }
 
   /** Placeholder for the wrench: a pale arc sweeping across the front during the active part, fading in recovery. */
