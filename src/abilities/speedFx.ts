@@ -5,7 +5,6 @@ import { drawLightning, type Lightning, lightning, SLOWMO } from './slowmo';
 
 const TRAIL_MS = 600; // how far back the lightning trail reaches
 const ARC_EVERY = 30; // ms between new arcs off the body
-const GHOST_GAP = 10; // px he runs between afterimages when they carry the look (was 14: more spread out, each its own figure)
 const LIGHT = 'speed-light';
 type Sprite = Phaser.GameObjects.Sprite & { body: Phaser.Physics.Arcade.Body };
 type Arc = { l: Lightning; born: number; life: number };
@@ -40,8 +39,10 @@ export class SpeedFx {
     this.light = scene.add.image(0, 0, LIGHT).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.effects - 2.75).setScale(3.5).setTint(SLOWMO.orange).setVisible(false);
   }
 
-  /** Per rendered frame. `k` is how strong slow-mo is right now (0 off, 1 full). `bolts` off: afterimages carry the look. */
-  update(now: number, s: Sprite, k: number, bolts = true) {
+  /** Per rendered frame. `k` is how strong slow-mo is right now (0 off, 1 full). `bolts` off: afterimages carry the look,
+   * one every `gap` px he runs: ~10+ reads as separate figures, ~2 blends them into one smooth streak.
+   */
+  update(now: number, s: Sprite, k: number, bolts = true, gap = 2) {
     const glow = this.glow.clear(), core = this.core.clear();
     if (k <= 0) {
       this.light.setVisible(false);
@@ -88,11 +89,11 @@ export class SpeedFx {
 
     // Afterimages: copies of him left behind as he runs. With the lightning they're a faint orange glow; without, they
     // carry the look: brighter, longer, and cooling from gold through orange to red as they fade, a speedster's streak.
-    if (moving && (bolts ? now >= this.nextGhost : Phaser.Math.Distance.BetweenPoints(s, this.lastGhost) >= GHOST_GAP)) {
+    if (moving && (bolts ? now >= this.nextGhost : Phaser.Math.Distance.BetweenPoints(s, this.lastGhost) >= gap)) {
       this.nextGhost = now + 45;
       this.lastGhost = { x: s.x, y: s.y };
       const ghost = this.scene.add.image(s.x, s.y, s.texture.key, s.frame.name).setOrigin(0.5, 1).setFlipX(s.flipX).setDepth(s.depth - 0.5)
-        .setTint(bolts ? SLOWMO.orange : SLOWMO.gold).setTintMode(Phaser.TintModes.FILL).setBlendMode(Phaser.BlendModes.ADD).setAlpha((bolts ? 0.2 : 0.5) * k);
+        .setTint(bolts ? SLOWMO.orange : SLOWMO.gold).setTintMode(Phaser.TintModes.FILL).setBlendMode(Phaser.BlendModes.ADD).setAlpha((bolts ? 0.2 : 0.5 * Math.min(1, gap / 5)) * k)  // closer copies overlap more, so each is fainter;
       const ramp = [SLOWMO.gold, SLOWMO.orange, SLOWMO.red];
       this.scene.tweens.add({
         targets: ghost, alpha: 0, duration: bolts ? 200 : 380,
