@@ -188,7 +188,8 @@ export class DogAI {
   /** Per rendered frame: animation, y-sort, the telegraph and the debug label. */
   update(now: number, showDebug: boolean) {
     const s = this.sprite, state = this.brain.state;
-    s.setDepth(DEPTH.actors + s.y);
+    // In slow-mo (timeScale < 1) dogs are lifted over the darkening with Christian, still sorted by feet, so he can't hide one.
+    s.setDepth(this.timeScale < 1 ? DEPTH.effects - 2.5 + s.y * 1e-5 : DEPTH.actors + s.y);
     const squash = this.flashT > 0 && !this.out; // squashed by the hit for a moment (flashT stops counting once knocked out)
     s.setScale(squash ? 1.2 : 1, squash ? 0.85 : 1);
     if (this.out) return this.knockedOut(now);

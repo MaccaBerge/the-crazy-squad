@@ -474,9 +474,10 @@ export class LevelScene extends Phaser.Scene {
     const s = this.active;
     this.worldT += (delta / 1000) * this.slow;
     const worldDt = Math.min(delta / 1000, 0.05) * this.slow;
-    // y-sort by feet. In slow-mo he's lifted over the darkening and his own light (SpeedFx), so he stays in full colour.
-    // shortcut: that also draws him over tree tops and roofs while it lasts; sort him under Above if it shows.
-    s.setDepth(this.slowmo ? DEPTH.effects - 2.5 : DEPTH.actors + s.y);
+    // y-sort by feet. In slow-mo he's lifted over the darkening and his own light (SpeedFx), so he stays in full colour;
+    // the dogs are lifted the same way (DogAI.update) and sorted with him, so a dog in front of him draws in front.
+    // shortcut: that also draws them over tree tops and roofs while it lasts; sort them under Above if it shows.
+    s.setDepth(this.slowmo ? DEPTH.effects - 2.5 + s.y * 1e-5 : DEPTH.actors + s.y);
     // Invincibility frames show as flicker.
     s.setAlpha(this.party.health[this.party.activeIndex].invulnerable && Math.floor(this.time.now / 60) % 2 ? 0.3 : 1);
     const { sprite } = this.party.active;
