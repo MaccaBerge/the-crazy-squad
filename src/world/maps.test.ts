@@ -5,6 +5,7 @@ import { isHangingKind } from '../nature/hangingShapes';
 import { isTreeName } from '../nature/treeTypes';
 import { isWeather } from '../nature/weather';
 import { ENTITY_TYPES, MAP_LAYERS, TILE, TILESETS } from './constants';
+import { isDogKind } from '../dogs/dogs';
 
 type TiledLayer = { name: string; type: string; width?: number; height?: number; data?: unknown; encoding?: string; layers?: TiledLayer[]; objects?: { id: number; type?: string; template?: string; ellipse?: boolean; point?: boolean; width?: number; polygon?: unknown[]; properties?: { name: string; value: unknown }[] }[] };
 type TiledMap = { orientation: string; infinite: boolean; width: number; height: number; tilewidth: number; tileheight: number; layers: TiledLayer[]; tilesets: Record<string, unknown>[]; properties?: { name: string; value: unknown }[] };
@@ -54,6 +55,10 @@ describe.each(Object.entries(files))('%s', (_path, raw) => {
     const objects = map.layers.find((l) => l.name === 'Entities')?.objects ?? [];
     for (const o of objects) expect(ENTITY_TYPES, `object ${o.id} has unknown class "${o.type}"`).toContain(o.type);
     expect(objects.filter((o) => o.type === 'PlayerSpawn').length, 'PlayerSpawn objects').toBe(1);
+    for (const o of objects.filter((o) => o.type === 'Dog')) {
+      const kind = (o.properties as { name: string; value: unknown }[] | undefined)?.find((p) => p.name === 'kind')?.value;
+      expect(isDogKind(kind), `dog ${o.id} has unknown kind "${kind}"`).toBe(true);
+    }
   });
 
   test('has a known weather preset', () => {
