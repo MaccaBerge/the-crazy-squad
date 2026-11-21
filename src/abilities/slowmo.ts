@@ -43,16 +43,38 @@ export function lightning(a: Vec, b: Vec, { depth = 4, jag = 0.22, fork = 0.15 }
   return { main, forks };
 }
 
+/** The first `g` (0–1) of a line of points, ending part way along a segment, so it can grow smoothly. */
+function prefix(ps: Vec[], g: number): Vec[] {
+  const f = Math.min(Math.max(g, 0), 1) * (ps.length - 1), i = Math.floor(f);
+  if (i >= ps.length - 1) return ps;
+  const a = ps[i], b = ps[i + 1], t = f - i;
+  if (t === 0) return ps.slice(0, i + 1); // exactly on a bend
+  return [...ps.slice(0, i + 1), { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }];
+}
+
+/**
+ * A bolt `g` (0–1) of the way grown, like a real strike: the channel reaches out from its start, and each fork sprouts
+ * once the channel passes its root, growing over the next few segments.
+ */
+export function grown(l: Lightning, g: number): Lightning {
+  if (g >= 1) return l;
+  const reach = g * (l.main.length - 1);
+  const forks = l.forks.map((f) => prefix(f, (reach - l.main.indexOf(f[0])) / 3)).filter((f) => f.length > 1);
+  return { main: prefix(l.main, g), forks };
+}
+
 type G = Phaser.GameObjects.Graphics;
 const px = (ps: Vec[], o: Vec) => ps.map((p) => ({ x: Math.round(p.x + o.x), y: Math.round(p.y + o.y) })) as Phaser.Math.Vector2[]; // strokePoints only reads x and y
 
 /**
  * Draws a bolt as the suit ramp, outside in: wide faint red, orange, gold, then a 1 px pale core. `glow` should be an
  * additive (ADD) graphics, so overlapping bolts get brighter like real light; `core` a normal one on top.
- * Points snap to whole pixels, so it stays pixel art at the game's resolution. `thin` halves the glow round the core.
+ * Points snap to whole pixels, so it stays pixel art at the game's resolution. `thin` halves the glow round the core;
+ * `grow` (0–1) draws it part way grown (see `grown`).
  */
-export function drawLightning(glow: G, core: G, l: Lightning, alpha: number, { thick = 1, thin = false, at = { x: 0, y: 0 } } = {}) {
-  const main = px(l.main, at), forks = l.forks.map((f) => px(f, at)), spread = thin ? 1 : 2;
+export function drawLightning(glow: G, core: G, bolt: Lightning, alpha: number, { thick = 1, thin = false, at = { x: 0, y: 0 }, grow = 1 } = {}) {
+  if (grow <= 0) return;
+  const l = grown(bolt, grow), main = px(l.main, at), forks = l.forks.map((f) => px(f, at)), spread = thin ? 1 : 2;
   glow.lineStyle(thick + spread * 2, SLOWMO.red, 0.22 * alpha).strokePoints(main);
   glow.lineStyle(thick + spread, SLOWMO.orange, 0.45 * alpha).strokePoints(main);
   if (!thin) for (const f of forks) glow.lineStyle(thick + 1, SLOWMO.orange, 0.4 * alpha).strokePoints(f);
