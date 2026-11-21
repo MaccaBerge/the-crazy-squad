@@ -117,6 +117,8 @@ type SettingsV1 = { version: 1; musicVolume: number; sfxVolume: number; shake: '
 
 The story is light but matters: it's why you're chasing the dogs.
 
+Comic cutscenes and live in-engine cutscenes (reveal shots started by trigger zones) are detailed in the [cutscene blueprint](cutscene-blueprint.md).
+
 - A story moment is **data**: a list of steps run by the `Dialogue` scene and a small script runner.
   ```ts
   type StoryStep =

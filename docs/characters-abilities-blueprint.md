@@ -49,15 +49,15 @@ The **world verb** is what makes "only Jonas can do this" puzzles work. It ties 
 
 ## 3. Turning real-life skills into characters
 
-For each of you, fill in this table, ideally together, since it's the fun part:
+Roles and basic attacks were agreed in the [combat blueprint](combat-blueprint.md). For each of you, fill in this table, ideally together, since it's the fun part:
 
 | | Marcus | Kristian | Christian | Jonas |
 |---|---|---|---|---|
 | Real-life skill or trait | | | | |
 | Fantasy ("in the game, this means…") | | | | |
-| Role | | | | |
-| Basic attack | | | | |
-| Ability 1 (signature) | | | | |
+| Role | Control | Bruiser | Fast fighter | Ranged |
+| Basic attack | Phone zap (short stun) | Wrench swing | Punch, punch, kick | Bandy shot (white ball) |
+| Ability 1 (signature) | Hack | Mechanic (to design) | Time-slow | Bandy (to design) |
 | Ability 2 | | | | |
 | Passive | | | | |
 | World verb | | | | |
