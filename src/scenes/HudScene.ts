@@ -132,8 +132,8 @@ export class HudScene extends Phaser.Scene {
   }
 
   /**
-   * Slow-mo: lightning round the screen edges. Bolts strike in from the edge or crawl along it, branch, live a few
-   * frames and flicker out, a new one every few frames, now and then a big one. `left` is the seconds of slow-mo left
+   * Slow-mo: lightning round the screen edges. Bolts strike in from the edge or crawl along it, branch, fade in, linger
+   * a quarter to half a second and fade out, a new one every 70–150 ms, now and then a big one. `left` is the seconds of slow-mo left
    * (0: off); in the last second it stutters, a warning that time is about to snap back.
    */
   private drawEdges(left: number) {
@@ -141,7 +141,7 @@ export class HudScene extends Phaser.Scene {
     if (left <= 0) return void (this.strikes = []);
     const w = this.scale.width, h = this.scale.height;
     if (now >= this.nextStrike) {
-      this.nextStrike = now + 35 + Math.random() * 40;
+      this.nextStrike = now + 70 + Math.random() * 80; // fewer, since each lives longer
       const side = Math.floor(Math.random() * 4), t = Math.random(), big = Math.random() < 0.12;
       // A point on that edge, the way into the screen from it, and the way along it.
       const at = [{ x: t * w, y: 0 }, { x: w, y: t * h }, { x: t * w, y: h }, { x: 0, y: t * h }][side];
@@ -150,13 +150,13 @@ export class HudScene extends Phaser.Scene {
       const sway = (Math.random() * 2 - 1) * 0.6, dir = crawl ? along : { x: inward.x + along.x * sway, y: inward.y + along.y * sway };
       const from = crawl ? { x: at.x + inward.x * (2 + Math.random() * 5), y: at.y + inward.y * (2 + Math.random() * 5) } : at;
       const to = { x: from.x + dir.x * len, y: from.y + dir.y * len };
-      this.strikes.push({ l: lightning(from, to, { depth: big ? 5 : 4, jag: crawl ? 0.12 : 0.22, fork: big ? 0.3 : 0.18 }), born: now, life: (big ? 160 : 80) + Math.random() * 100, thick: 1 });
+      this.strikes.push({ l: lightning(from, to, { depth: big ? 5 : 4, jag: crawl ? 0.12 : 0.22, fork: big ? 0.3 : 0.18 }), born: now, life: (big ? 450 : 250) + Math.random() * 200, thick: 1 });
     }
     this.strikes = this.strikes.filter((b) => now - b.born < b.life);
     if (left < 1 && Math.floor(now / 70) % 3 === 0) return;
     for (const b of this.strikes) {
-      const age = (now - b.born) / b.life, flick = Math.random() < 0.2 ? 0.35 : 1;
-      drawLightning(glow, core, b.l, flick * (age < 0.15 ? 1 : 1 - (age - 0.15) / 0.85), { thick: b.thick, thin: true });
+      const age = (now - b.born) / b.life, flick = Math.random() < 0.08 ? 0.35 : 1;
+      drawLightning(glow, core, b.l, flick * Math.min(1, age / 0.15, (1 - age) / 0.5), { thick: b.thick, thin: true });
     }
   }
 }
