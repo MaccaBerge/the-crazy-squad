@@ -55,7 +55,7 @@ export const tuning = {
   slowmo: 0.3, // world speed during Christian's slow-mo (everything but him)
   slowmoSpeed: 1.6, // and his own speed and acceleration then, so he looks even faster next to the slowed world
   speedLightning: 0, // 1: lightning off his body and along his trail during slow-mo; 0: afterimages only (testing)
-  streak: 1, // 1: the afterimage is one merged shape with a colour and fade gradient; 0: separate copies, ghostGap apart
+  streak: 0, // 1: the afterimage is one merged shape with a colour and fade gradient; 0: separate copies, ghostGap apart
   ghostGap: 2, // px between afterimages: 2 blends them into one smooth streak, 10 or 14 shows separate figures
   ...WEATHER[DEFAULT_WEATHER], // replaced by the map's weather on load
 };
