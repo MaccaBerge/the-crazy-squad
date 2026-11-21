@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import type { Vec } from '../movement';
 import { DEPTH } from '../world/constants';
-import { drawLightning, type Lightning, lightning, SLOWMO } from './slowmo';
+import { drawLightning, type Lightning, lightning, SLOWMO, streakColor } from './slowmo';
 
 const TRAIL_MS = 600; // how far back the lightning trail reaches
 const ARC_EVERY = 30; // ms between new arcs off the body
@@ -23,6 +23,9 @@ export class SpeedFx {
   private nextArc = 0;
   private nextGhost = 0;
   private lastGhost: Vec = { x: 0, y: 0 };
+  private streak?: Phaser.GameObjects.RenderTexture;
+  private stamps: Phaser.GameObjects.Image[] = []; // one per pose: the texture draws them all at render(), so they can't share one
+  private poses: (Vec & { frame: string | number; flip: boolean; t: number })[] = [];
 
   constructor(private scene: Phaser.Scene) {
     this.glow = scene.add.graphics().setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.effects + 1);
@@ -39,10 +42,12 @@ export class SpeedFx {
     this.light = scene.add.image(0, 0, LIGHT).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.effects - 2.75).setScale(3.5).setTint(SLOWMO.orange).setVisible(false);
   }
 
-  /** Per rendered frame. `k` is how strong slow-mo is right now (0 off, 1 full). `bolts` off: afterimages carry the look,
-   * one every `gap` px he runs: ~10+ reads as separate figures, ~2 blends them into one smooth streak.
+  /**
+   * Per rendered frame. `k` is how strong slow-mo is right now (0 off, 1 full). `bolts` off: afterimages carry the look,
+   * either as one merged `streak`, or as copies one every `gap` px (~10+ separate figures, ~2 blended).
    */
-  update(now: number, s: Sprite, k: number, bolts = true, gap = 2) {
+  update(now: number, s: Sprite, k: number, { bolts = true, gap = 2, streak = false } = {}) {
+    this.drawStreak(now, s, k, !bolts && streak);
     const glow = this.glow.clear(), core = this.core.clear();
     if (k <= 0) {
       this.light.setVisible(false);
@@ -89,11 +94,11 @@ export class SpeedFx {
 
     // Afterimages: copies of him left behind as he runs. With the lightning they're a faint orange glow; without, they
     // carry the look: brighter, longer, and cooling from gold through orange to red as they fade, a speedster's streak.
-    if (moving && (bolts ? now >= this.nextGhost : Phaser.Math.Distance.BetweenPoints(s, this.lastGhost) >= gap)) {
+    if (moving && !(streak && !bolts) && (bolts ? now >= this.nextGhost : Phaser.Math.Distance.BetweenPoints(s, this.lastGhost) >= gap)) {
       this.nextGhost = now + 45;
       this.lastGhost = { x: s.x, y: s.y };
       const ghost = this.scene.add.image(s.x, s.y, s.texture.key, s.frame.name).setOrigin(0.5, 1).setFlipX(s.flipX).setDepth(s.depth - 0.5)
-        .setTint(bolts ? SLOWMO.orange : SLOWMO.gold).setTintMode(Phaser.TintModes.FILL).setBlendMode(Phaser.BlendModes.ADD).setAlpha((bolts ? 0.2 : 0.5 * Math.min(1, gap / 5)) * k)  // closer copies overlap more, so each is fainter;
+        .setTint(bolts ? SLOWMO.orange : SLOWMO.gold).setTintMode(Phaser.TintModes.FILL).setBlendMode(Phaser.BlendModes.ADD).setAlpha((bolts ? 0.2 : 0.5 * Math.min(1, gap / 5)) * k); // closer copies overlap more, so each is fainter
       const ramp = [SLOWMO.gold, SLOWMO.orange, SLOWMO.red];
       this.scene.tweens.add({
         targets: ghost, alpha: 0, duration: bolts ? 200 : 380,
@@ -102,4 +107,34 @@ export class SpeedFx {
       });
     }
   }
+
+  /**
+   * One merged afterimage: every frame, his last STREAK_MS of poses are drawn as solid silhouettes into one texture,
+   * oldest first, so where they overlap the newest wins instead of piling up. Each is coloured by its age (gold → orange
+   * → red) and darkened toward black, and the texture is drawn additively, where black is see-through: one shape with a
+   * colour gradient and a fade along it.
+   */
+  private drawStreak(now: number, s: Sprite, k: number, on: boolean) {
+    if (!on || k <= 0) {
+      this.poses = [];
+      this.streak?.setVisible(false);
+      return;
+    }
+    if (!this.streak) {
+      this.streak = this.scene.add.renderTexture(0, 0, STREAK_W, STREAK_H).setBlendMode(Phaser.BlendModes.ADD);
+    }
+    if (s.body.velocity.length() > 10) this.poses.push({ x: s.x, y: s.y, frame: s.frame.name, flip: s.flipX, t: now });
+    this.poses = this.poses.filter((p) => now - p.t < STREAK_MS);
+    const cx = Math.round(s.x), cy = Math.round(s.y - STREAK_H / 4), left = cx - STREAK_W / 2, top = cy - STREAK_H / 2;
+    const rt = this.streak.setVisible(true).setPosition(cx, cy).setDepth(s.depth - 0.5).setAlpha(k).clear();
+    this.poses.forEach((p, i) => {
+      const stamp = (this.stamps[i] ??= new Phaser.GameObjects.Image(this.scene, 0, 0, s.texture.key).setOrigin(0.5, 1).setTintMode(Phaser.TintModes.FILL));
+      stamp.setTexture(s.texture.key, p.frame).setFlipX(p.flip).setTint(streakColor((now - p.t) / STREAK_MS));
+      rt.draw(stamp, Math.round(p.x - left), Math.round(p.y - top));
+    });
+    rt.render();
+  }
 }
+
+const STREAK_MS = 380; // how far back the merged afterimage reaches
+const STREAK_W = 192, STREAK_H = 96; // px: room for the streak at top slow-mo speed in any direction
