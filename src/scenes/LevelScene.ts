@@ -220,7 +220,7 @@ export class LevelScene extends Phaser.Scene {
     // Slow-mo's look: colour drains and the edges darken. Off until it runs (cleared first: a restart reuses the camera).
     cam.filters.internal.clear();
     this.grade = cam.filters.internal.addColorMatrix().setActive(false);
-    this.vignette = cam.filters.internal.addVignette(0.5, 0.5, 0.8, 0).setActive(false);
+    this.vignette = cam.filters.internal.addVignette(0.5, 0.5, 0.8, 0, SLOWMO.edge).setActive(false);
     const zoomTo = (z: number) => cam.setZoom(Phaser.Math.Clamp(z, 0.25, 3));
     this.input.on('wheel', (_p: unknown, _o: unknown, _dx: number, dy: number) => zoomTo(cam.zoom * Math.exp(-dy * 0.002))); // smooth on trackpads too
     this.input.keyboard!.on('keydown-MINUS', () => zoomTo(cam.zoom / 1.25));
@@ -530,7 +530,7 @@ export class LevelScene extends Phaser.Scene {
     if (s.body.velocity.length() > 10 && now >= this.nextGhost) {
       this.nextGhost = now + 40;
       const ghost = this.add.image(s.x, s.y, s.texture.key, s.frame.name).setOrigin(0.5, 1).setFlipX(s.flipX).setDepth(s.depth - 0.5)
-        .setTint(SLOWMO.glow).setTintMode(Phaser.TintModes.FILL).setAlpha(0.45);
+        .setTint(SLOWMO.ghost).setTintMode(Phaser.TintModes.FILL).setAlpha(0.45);
       this.tweens.add({ targets: ghost, alpha: 0, duration: 220, onComplete: () => ghost.destroy() });
     }
     if (now >= this.nextCrackle) {

@@ -1,13 +1,18 @@
 import type { Vec } from '../movement';
 
-/** Slow-mo look in one place, so other colours (Christian's suit) are a one-line try. */
+/**
+ * Slow-mo look in one place, taken from Christian's suit (sprite colours): red body, gold trim, pale highlight.
+ * The first try was cold: core 0xfff6dc, glow 0xf2c846, ghost = glow, tint [0.85, 0.92, 1.1], edge 0x000000.
+ */
 export const SLOWMO = {
-  core: 0xfff6dc, // lightning core
-  glow: 0xf2c846, // lightning glow, afterimages, the HUD icon
+  core: 0xf1e0c6, // lightning core: the suit's pale highlight
+  glow: 0xf0bc66, // lightning glow and the HUD icon: the suit's gold trim
+  ghost: 0xb6201f, // afterimages: the suit's red
   zoom: 1.12, // camera zoom in while it lasts
   desaturate: 0.6, // how much colour drains from the world (0–1)
-  tint: [0.85, 0.92, 1.1] as const, // RGB multipliers: a cold blue cast
-  vignette: 0.45, // darkness at the screen edges
+  tint: [1.1, 0.88, 0.85] as const, // RGB multipliers: a warm red cast
+  vignette: 0.5, // strength of the darkening at the screen edges
+  edge: 0x371116, // its colour: the suit's darkest red
 };
 
 /**
