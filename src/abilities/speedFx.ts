@@ -5,7 +5,7 @@ import { drawLightning, type Lightning, lightning, SLOWMO } from './slowmo';
 
 const TRAIL_MS = 600; // how far back the lightning trail reaches
 const ARC_EVERY = 30; // ms between new arcs off the body
-const GHOST_GAP = 14; // px he runs between afterimages when they carry the look, so each reads as its own figure
+const GHOST_GAP = 10; // px he runs between afterimages when they carry the look (was 14: more spread out, each its own figure)
 const LIGHT = 'speed-light';
 type Sprite = Phaser.GameObjects.Sprite & { body: Phaser.Physics.Arcade.Body };
 type Arc = { l: Lightning; born: number; life: number };
