@@ -1,4 +1,5 @@
 import type { CharacterDef } from '../characters/types';
+import { Ability } from '../abilities/ability';
 import { Health } from '../collision/hits';
 import type { Action } from '../input/actions';
 import { Stamina, type StaminaTuning } from './stamina';
@@ -18,6 +19,8 @@ export class Party {
   readonly stamina: Stamina[];
   /** One per member, kept while off stage. A downed member (0 HP) stays out. */
   readonly health: Health[];
+  /** Each member's ability1, recharging while off stage (blueprint §5). */
+  readonly abilities: (Ability | undefined)[];
 
   constructor(
     readonly members: readonly CharacterDef[],
@@ -26,6 +29,7 @@ export class Party {
   ) {
     this.stamina = members.map(() => new Stamina(tuning));
     this.health = members.map((m) => new Health(m.stats.maxHp));
+    this.abilities = members.map((m) => m.ability1 && new Ability(m.ability1));
   }
 
   get active() {
@@ -42,6 +46,7 @@ export class Party {
     this.cooldownLeft -= dt;
     if (this.cooldownLeft < 1e-6) this.cooldownLeft = 0; // float leftovers from many small steps
     for (const h of this.health) h.tick(dt);
+    for (const a of this.abilities) a?.tick(dt);
     return this.stamina.map((s, i) => s.tick(dt, sprinting && i === this.activeIndex))[this.activeIndex];
   }
 
