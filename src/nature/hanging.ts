@@ -48,7 +48,9 @@ export class Hanging {
 
   private add(id: number, x: number, y: number, box: { left: number; top: number; w: number; h: number },
     draw: Thing['draw'], swing: Thing['swing']) {
-    const tex = this.scene.textures.createCanvas(`hanging:${id}`, box.w, box.h)!;
+    const key = `hanging:${id}`;
+    if (this.scene.textures.exists(key)) this.scene.textures.remove(key); // left over from before a level restart
+    const tex = this.scene.textures.createCanvas(key, box.w, box.h)!;
     this.scene.add.image(x + box.left, y + box.top, tex).setOrigin(0).setDepth(DEPTH.actors + y);
     this.things.push({ draw, swing, tex, box, x, y, drawn: 0 });
   }

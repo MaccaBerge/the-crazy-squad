@@ -18,11 +18,12 @@ function drawDigit(g: Phaser.GameObjects.Graphics, d: string, x: number, y: numb
     DIGITS[d].forEach((row, r) => [...row].forEach((c, col) => c === '#' && g.fillStyle(color).fillRect(x + col + o, y + r + o, 1, 1)));
 }
 
-/** Squad portraits and the swap cooldown. Runs on top of the level and only reads the party (players blueprint §6). */
+/** Squad portraits, health and the swap cooldown. Runs on top of the level and only reads the party (players blueprint §6). */
 export class HudScene extends Phaser.Scene {
   private party!: Party;
   private portraits: Phaser.GameObjects.Image[] = [];
   private gfx!: Phaser.GameObjects.Graphics;
+  private bars!: Phaser.GameObjects.Graphics; // over the portraits
   private root!: Phaser.GameObjects.Container;
 
   constructor() {
@@ -45,6 +46,8 @@ export class HudScene extends Phaser.Scene {
       this.root.add(p);
       return p;
     });
+    this.bars = this.add.graphics();
+    this.root.add(this.bars);
     const place = () => this.root.setPosition(MARGIN, this.scale.height - MARGIN - FRAME);
     place();
     this.scale.on(Phaser.Scale.Events.RESIZE, place);
@@ -60,6 +63,14 @@ export class HudScene extends Phaser.Scene {
     g.lineStyle(1, 0xffffff).strokeRect(ax - 0.5, -0.5, FRAME + 1, FRAME + 1);
     // Swap cooldown: a bar that empties, and the others dimmed until you can swap again.
     if (cooldownLeft > 0) g.fillStyle(0xffffff).fillRect(0, FRAME + 1, Math.round(width * this.party.cooldownFraction), 1);
-    this.portraits.forEach((p, i) => p.setAlpha(i === activeIndex || cooldownLeft === 0 ? 1 : 0.4));
+    const b = this.bars.clear();
+    this.portraits.forEach((p, i) => {
+      const { down, fraction } = this.party.health[i];
+      // Health: a 2px bar along the portrait's bottom; downed members go dark and can't be picked.
+      const x = i * (FRAME + GAP);
+      b.fillStyle(0x241520).fillRect(x, FRAME - 2, FRAME, 2);
+      if (!down) b.fillStyle(fraction > 0.3 ? 0xf2a846 : 0xb4443a).fillRect(x, FRAME - 2, Math.max(1, Math.round(FRAME * fraction)), 2);
+      p.setAlpha(down ? 0.2 : i === activeIndex || cooldownLeft === 0 ? 1 : 0.4);
+    });
   }
 }

@@ -80,7 +80,9 @@ export class Trees {
       const img = scene.textures.get(`tree:${o.type}`).getSourceImage() as HTMLImageElement;
       if (!this.parts.has(o.type)) this.parts.set(o.type, cutParts(img, t));
       const parts = this.parts.get(o.type)!;
-      const tex = scene.textures.createCanvas(`tree-sway:${o.id}`, img.width, img.height)!; // each tree rustles on its own
+      const key = `tree-sway:${o.id}`;
+      if (scene.textures.exists(key)) scene.textures.remove(key); // left over from before a level restart
+      const tex = scene.textures.createCanvas(key, img.width, img.height)!; // each tree rustles on its own
       tex.getContext().drawImage(img, 0, 0);
       tex.refresh();
       const sprite = scene.add.image(x, y, tex).setDepth(DEPTH.actors + y);

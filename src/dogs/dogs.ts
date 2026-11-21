@@ -1,7 +1,8 @@
 import type * as Phaser from 'phaser';
 import { DEPTH } from '../world/constants';
 
-// The dog enemies, for now only standing on the map and turning to face you (no AI, animations or weapons yet).
+// The dog enemies that only stand on the map: turning to face you, or looping one animation (the showcase).
+// Dogs that think are DogAI (dogAI.ts).
 // Sheets come from `npm run art` (art/dogs.mjs): 8 frames in facing.ts order, right first, clockwise.
 
 export const DOG_KINDS = ['heavy-gunner', 'k9-cop', 'long-shot', 'bruiser', 'mad-bomber'] as const;

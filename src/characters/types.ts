@@ -9,6 +9,6 @@ export type CharacterDef = {
   sprite?: string;
   /** Feet hitbox in px (collision blueprint §3). */
   body: { w: number; h: number };
-  /** Multipliers on the shared movement tuning, so the T panel still tunes everyone at once. */
-  stats: { speed: number; accel: number };
+  /** maxHp in points. speed and accel are multipliers on the shared movement tuning, so the T panel still tunes everyone at once. */
+  stats: { maxHp: number; speed: number; accel: number };
 };

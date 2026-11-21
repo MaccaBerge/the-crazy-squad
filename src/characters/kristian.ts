@@ -7,5 +7,5 @@ export const kristian: CharacterDef = {
   placeholder: { initial: 'K', color: 0xe0533d },
   sprite: 'kristian',
   body: { w: 12, h: 6 },
-  stats: { speed: 0.9, accel: 0.85 },
+  stats: { maxHp: 100, speed: 0.9, accel: 0.85 },
 };
