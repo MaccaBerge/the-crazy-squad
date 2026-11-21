@@ -27,6 +27,7 @@ const FLASH = 0.06; // s of white after a hit
 const DIZZY = 0.6; // s of spinning with stars when knocked out, before the poof
 const POOF = 0.25; // s of the poof
 const HELD_MAX = 400; // px/s cap on knockback saved up during slow-mo, so a long combo doesn't fling a dog off the map
+const RELEASE = 2.5; // saved-up knockback lands this much harder, and for twice as long: the payoff for hitting in slow-mo
 
 /**
  * One thinking dog (dog AI blueprint §11): the brain decides, this turns it into movement, animation and the hit.
@@ -111,8 +112,8 @@ export class DogAI {
     const { x, y } = this.held;
     this.held = { x: 0, y: 0 };
     if (this.out || Math.hypot(x, y) < 1) return false;
-    this.knock = { x, y };
-    this.knockT = KNOCK;
+    this.knock = { x: x * RELEASE, y: y * RELEASE };
+    this.knockT = KNOCK * 2;
     this.flashT = FLASH;
     return true;
   }
