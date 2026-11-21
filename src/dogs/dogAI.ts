@@ -26,8 +26,7 @@ const KNOCK = 0.15; // s a hit pushes the dog around
 const FLASH = 0.06; // s of white after a hit
 const DIZZY = 0.6; // s of spinning with stars when knocked out, before the poof
 const POOF = 0.25; // s of the poof
-const HELD_MAX = 400; // px/s cap on knockback saved up during slow-mo, so a long combo doesn't fling a dog off the map
-const RELEASE = 2.5; // saved-up knockback lands this much harder, and for twice as long: the payoff for hitting in slow-mo
+const SLOW_PUSH = 2; // hits in slow-mo push this much harder (still played out in slow motion): the reward for hitting then
 
 /**
  * One thinking dog (dog AI blueprint §11): the brain decides, this turns it into movement, animation and the hit.
@@ -58,8 +57,6 @@ export class DogAI {
   private flashT = 0;
   /** World speed for this dog: 1 normal, below 1 in slow-mo. Its movement, timers and animation all run this much slower. */
   timeScale = 1;
-  /** Knockback from hits in slow-mo, saved until time snaps back (release). */
-  private held: Vec = { x: 0, y: 0 };
   /** Seconds since being knocked out, or -1 while still in the fight. */
   private ko = -1;
 
@@ -89,14 +86,9 @@ export class DogAI {
    */
   takeHit(damage: number, push: Vec) {
     if (this.out || !this.health.take(damage, IFRAMES)) return false;
-    const w = this.breed.weight;
-    if (this.timeScale < 1) {
-      const x = this.held.x + push.x * w, y = this.held.y + push.y * w, k = Math.min(1, HELD_MAX / (Math.hypot(x, y) || 1));
-      this.held = { x: x * k, y: y * k };
-    } else {
-      this.knock = { x: push.x * w, y: push.y * w };
-      this.knockT = KNOCK;
-    }
+    const w = this.breed.weight * (this.timeScale < 1 ? SLOW_PUSH : 1);
+    this.knock = { x: push.x * w, y: push.y * w };
+    this.knockT = KNOCK;
     this.flashT = FLASH;
     hurt(this.brain, Math.hypot(push.x, push.y) >= this.breed.poise);
     if (this.health.down) {
@@ -104,17 +96,6 @@ export class DogAI {
       this.ko = 0;
       this.sprite.disableBody(false, false);
     }
-    return true;
-  }
-
-  /** Slow-mo ended: all the knockback saved up lands at once. Returns whether there was any. */
-  release() {
-    const { x, y } = this.held;
-    this.held = { x: 0, y: 0 };
-    if (this.out || Math.hypot(x, y) < 1) return false;
-    this.knock = { x: x * RELEASE, y: y * RELEASE };
-    this.knockT = KNOCK * 2;
-    this.flashT = FLASH;
     return true;
   }
 

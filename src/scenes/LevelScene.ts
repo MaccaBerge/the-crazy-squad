@@ -363,24 +363,17 @@ export class LevelScene extends Phaser.Scene {
     this.tweens.add({ targets: cam, zoom: this.baseZoom * SLOWMO.zoom, duration: 250, ease: 'Cubic.Out' });
   }
 
-  /** Time snaps back (ran out, or swapped out): every saved-up knockback lands at once, and the camera snaps out. */
+  /** Time snaps back (ran out, or swapped out): the camera snaps out with a shake. */
   private endSlowmo() {
     this.slowmo = false;
     this.slowLook.endedAt = this.time.now;
     this.slow = 1;
     for (const a of this.party.abilities) a?.end();
-    let landed = false;
-    for (const d of this.brains) {
-      d.timeScale = 1;
-      if (!d.release()) continue;
-      landed = true;
-      this.sparks.push({ x: d.sprite.x, y: d.sprite.y - 10, at: this.time.now, big: true });
-    }
+    for (const d of this.brains) d.timeScale = 1;
     const cam = this.cameras.main;
     this.tweens.killTweensOf(cam);
     this.tweens.add({ targets: cam, zoom: this.baseZoom, duration: 160, ease: 'Cubic.In' });
-    cam.shake(landed ? 160 : 100, landed ? 0.008 : 0.004);
-    if (landed) this.freeze(tuning.heavyHitstop);
+    cam.shake(100, 0.004);
   }
 
   /** Dev spawn: the next breed, on the first free spot about 4 tiles from you. */
