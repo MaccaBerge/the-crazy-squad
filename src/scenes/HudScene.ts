@@ -44,7 +44,7 @@ export class HudScene extends Phaser.Scene {
   private root!: Phaser.GameObjects.Container;
   private edgeGlow!: Phaser.GameObjects.Graphics; // slow-mo lightning round the screen, under the panel: additive glow…
   private edgeCore!: Phaser.GameObjects.Graphics; // …and the bright cores on top
-  private strikes: { l: Lightning; born: number; life: number; thick: number }[] = [];
+  private strikes: { l: Lightning; born: number; life: number; grow: number; thick: number }[] = [];
   private nextStrike = 0;
   private wasReady = true;
   private readyAt = -Infinity;
@@ -132,8 +132,8 @@ export class HudScene extends Phaser.Scene {
   }
 
   /**
-   * Slow-mo: lightning round the screen edges. Bolts strike in from the edge or crawl along it, branch, fade in, linger
-   * a quarter to half a second and fade out, a new one every 70–150 ms, now and then a big one. `left` is the seconds of slow-mo left
+   * Slow-mo: lightning round the screen edges. Bolts strike in from the edge or crawl along it, branch, grow out from
+   * the edge like a real strike, flash, linger and fade, a new one every 70–150 ms, now and then a big one. `left` is the seconds of slow-mo left
    * (0: off); in the last second it stutters, a warning that time is about to snap back.
    */
   private drawEdges(left: number) {
@@ -150,13 +150,16 @@ export class HudScene extends Phaser.Scene {
       const sway = (Math.random() * 2 - 1) * 0.6, dir = crawl ? along : { x: inward.x + along.x * sway, y: inward.y + along.y * sway };
       const from = crawl ? { x: at.x + inward.x * (2 + Math.random() * 5), y: at.y + inward.y * (2 + Math.random() * 5) } : at;
       const to = { x: from.x + dir.x * len, y: from.y + dir.y * len };
-      this.strikes.push({ l: lightning(from, to, { depth: big ? 5 : 4, jag: crawl ? 0.12 : 0.22, fork: big ? 0.3 : 0.18 }), born: now, life: (big ? 450 : 250) + Math.random() * 200, thick: 1 });
+      this.strikes.push({ l: lightning(from, to, { depth: big ? 5 : 4, jag: crawl ? 0.12 : 0.22, fork: big ? 0.3 : 0.18 }), born: now, life: (big ? 450 : 250) + Math.random() * 200, grow: big ? 220 : 140, thick: 1 });
     }
     this.strikes = this.strikes.filter((b) => now - b.born < b.life);
     if (left < 1 && Math.floor(now / 70) % 3 === 0) return;
     for (const b of this.strikes) {
-      const age = (now - b.born) / b.life, flick = Math.random() < 0.08 ? 0.35 : 1;
-      drawLightning(glow, core, b.l, flick * Math.min(1, age / 0.15, (1 - age) / 0.5), { thick: b.thick, thin: true });
+      // Like a real strike: a dim leader reaches out from the edge, flashes to full brightness when it's all the way out,
+      // then fades over the second half of its life.
+      const ms = now - b.born, grow = ms / b.grow, age = ms / b.life, flick = Math.random() < 0.08 ? 0.35 : 1;
+      const bright = grow < 1 ? 0.55 : Math.min(1, (1 - age) / 0.5);
+      drawLightning(glow, core, b.l, flick * bright, { thick: b.thick, thin: true, grow });
     }
   }
 }
