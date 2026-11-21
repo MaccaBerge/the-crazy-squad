@@ -1,5 +1,11 @@
 /** A signature ability (characters & abilities blueprint §4). `id` says which effect the scene runs. */
-export type AbilityDef = { id: 'slowmo'; cooldown: number; duration: number };
+export type AbilityDef = {
+  id: 'slowmo';
+  cooldown: number;
+  duration: number;
+  /** Sprinting is free while it's active, and stamina empties when it ends (you ran yourself dry). */
+  freeSprint?: boolean;
+};
 
 /**
  * ready ─(start)─► active ─(runs out, or ended early)─► cooldown ─► ready. Pure, so it ticks off stage too.

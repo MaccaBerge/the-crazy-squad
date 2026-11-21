@@ -21,6 +21,7 @@ export class Party {
   readonly health: Health[];
   /** Each member's ability1, recharging while off stage (blueprint §5). */
   readonly abilities: (Ability | undefined)[];
+  private wasActive: boolean[] = []; // each ability's state at the last tick, to notice it ending however it ended
 
   constructor(
     readonly members: readonly CharacterDef[],
@@ -41,13 +42,22 @@ export class Party {
     return this.tuning.swapCooldown > 0 ? this.cooldownLeft / this.tuning.swapCooldown : 0;
   }
 
-  /** `sprinting`: the active member holds sprint while moving. Returns whether they actually sprint this step. */
+  /**
+   * `sprinting`: the active member holds sprint while moving. Returns whether they actually sprint this step.
+   * An ability that ended since the last tick (ran out or ended early) is noticed here.
+   */
   tick(dt: number, sprinting = false): boolean {
     this.cooldownLeft -= dt;
     if (this.cooldownLeft < 1e-6) this.cooldownLeft = 0; // float leftovers from many small steps
     for (const h of this.health) h.tick(dt);
-    for (const a of this.abilities) a?.tick(dt);
-    return this.stamina.map((s, i) => s.tick(dt, sprinting && i === this.activeIndex))[this.activeIndex];
+    return this.stamina.map((s, i) => {
+      const a = this.abilities[i];
+      a?.tick(dt);
+      if (this.wasActive[i] && !a?.active && a?.def.freeSprint) s.empty(); // also when it was ended early (swapped out)
+      this.wasActive[i] = !!a?.active;
+      const own = sprinting && i === this.activeIndex;
+      return a?.active && a.def.freeSprint ? own : s.tick(dt, own); // free sprint: the bar waits
+    })[this.activeIndex];
   }
 
   /** The member index a swap action asks for. */

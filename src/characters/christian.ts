@@ -16,5 +16,5 @@ export const christian: CharacterDef = {
     { damage: 18, windup: 0.05, active: 0.06, recovery: 0.3, radius: 14, arc: 90, knockback: 120, hitstop: 80, lunge: 6, shake: true, anim: 'kick' },
   ],
   // Slow-mo: he runs so fast the world slows down around him. The slowdown itself is tuning.slowmo (T panel).
-  ability1: { id: 'slowmo', cooldown: 15, duration: 10 },
+  ability1: { id: 'slowmo', cooldown: 15, duration: 10, freeSprint: true },
 };

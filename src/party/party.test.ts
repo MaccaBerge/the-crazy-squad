@@ -58,3 +58,16 @@ test('going down forces a swap to the next one standing, ignoring the cooldown, 
   for (const i of [0, 2, 3]) p.health[i].hp = 0;
   expect(p.forceSwap()).toBe(false);
 });
+
+test('a freeSprint ability makes sprinting free while active, and empties stamina when it ends', () => {
+  const p = new Party(SQUAD, { swapCooldown: 0, ...defaultStamina });
+  expect(p.trySwap(2, fits)).toBe('ok'); // Christian
+  const a = p.abilities[2]!, st = p.stamina[2];
+  a.start();
+  for (let i = 0; i < 60 * 8; i++) expect(p.tick(1 / 60, true)).toBe(true); // far past drainTime, still sprinting
+  expect(st.value).toBe(1);
+  a.end();
+  expect(p.tick(1 / 60, true)).toBe(false); // ran dry the moment it ended
+  expect(st.value).toBe(0);
+  expect(st.winded).toBe(true);
+});

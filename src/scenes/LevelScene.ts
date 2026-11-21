@@ -584,7 +584,7 @@ export class LevelScene extends Phaser.Scene {
     const st = this.party.stamina[this.party.activeIndex];
     const g = this.staminaBar.clear();
     this.drawSweat(g, s, st.exhausted, dt);
-    if (st.value >= 1) return;
+    if (st.value >= 1 || this.slowmo) return; // slow-mo sprints for free: no bar
     const w = 14, x = Math.round(s.x - w / 2), y = Math.round(s.y + 2);
     const flashOff = st.exhausted && Math.floor(this.time.now / 150) % 2 === 1;
     g.fillStyle(flashOff ? 0x7a2a36 : 0x241520).fillRect(x - 1, y - 1, w + 2, 4);

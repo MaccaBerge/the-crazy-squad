@@ -32,6 +32,14 @@ export class Stamina {
     return !this.winded && this.value > 0;
   }
 
+  /** Empty it at once, as if it just ran dry: winded and exhausted. */
+  empty() {
+    this.value = 0;
+    this.winded = true;
+    this.exhaustedLeft = this.tuning.exhaustTime;
+    this.restLeft = this.tuning.regenDelay;
+  }
+
   /** `sprinting`: sprint held while moving. Returns whether the character actually sprints this step. */
   tick(dt: number, sprinting: boolean): boolean {
     const t = this.tuning;
