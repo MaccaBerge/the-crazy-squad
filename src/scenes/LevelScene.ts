@@ -41,6 +41,7 @@ const STRESS_BLADES = Number(new URLSearchParams(location.search).get('grass')) 
 const NUDGE_SPEED = 0.6; // corner assist sideways speed, as a share of top speed
 const HURT = 0.18; // seconds a hit pushes you around before your input counts again
 const SPARK = 140; // ms a hit spark lasts
+const FADE_OUT = 120; // ms the slow-mo look takes to fade when it ends
 const SLOW_IN = 0.12; // s for the world to ease down into slow-mo (it snaps back at the end)
 const ATTACK_SLOW = 0.4; // share of walking speed while swinging: you can creep, not run (combat blueprint §3)
 
@@ -58,7 +59,7 @@ export const tuning = {
   slowmo: 0.3, // world speed during Christian's slow-mo (everything but him)
   slowmoSpeed: 1.6, // and his own speed and acceleration then, so he looks even faster next to the slowed world
   speedLightning: 0, // 1: lightning off his body and along his trail during slow-mo; 0: afterimages only (testing)
-  streak: 1, // 1: the afterimage is one merged shape with a colour and fade gradient; 0: separate copies, ghostGap apart
+  streak: 0, // 1: the afterimage is one merged shape with a colour and fade gradient; 0: separate copies, ghostGap apart
   fxShockwave: 1, waveRadius: 160, waveStrength: 4, waveMs: 450, // shader ring when slow-mo starts and ends (shader blueprint §6)
   fxShimmer: 1, shimmerStrength: 1, // heat haze behind Christian while he runs in slow-mo
   ghostGap: 2, // px between afterimages: 2 blends them into one smooth streak, 10 or 14 shows separate figures
@@ -112,6 +113,7 @@ export class LevelScene extends Phaser.Scene {
   private readout?: HTMLDivElement;
   private slowmo = false; // Christian's slow-mo is running
   private slow = 1; // world speed now: eases down to tuning.slowmo while slow-mo runs
+  private slowLook = { k: 0, endedAt: -Infinity }; // the look's strength when it ended, so it fades out instead of popping
   private worldT = 0; // s of world time, the clock nature runs on: slowed in slow-mo
   private shade!: Phaser.GameObjects.Rectangle; // darkens the world, but not the lightning drawn above it
   private vignette!: Phaser.Filters.Vignette;
@@ -147,6 +149,7 @@ export class LevelScene extends Phaser.Scene {
     this.frozenUntil = 0;
     this.slowmo = false;
     this.slow = 1;
+    this.slowLook = { k: 0, endedAt: -Infinity };
     this.worldT = 0;
     const { map, layers, colliders } = loadMap(this, MAP);
     const weather = (map.properties as { name: string; value: unknown }[]).find((p) => p.name === 'weather')?.value;
@@ -384,6 +387,7 @@ export class LevelScene extends Phaser.Scene {
   /** Time snaps back (ran out, or swapped out): every saved-up knockback lands at once, and the camera snaps out. */
   private endSlowmo() {
     this.slowmo = false;
+    this.slowLook.endedAt = this.time.now;
     this.slow = 1;
     for (const a of this.party.abilities) a?.end();
     let landed = false;
@@ -496,9 +500,10 @@ export class LevelScene extends Phaser.Scene {
     const s = this.active;
     this.worldT += (delta / 1000) * this.slow;
     const worldDt = Math.min(delta / 1000, 0.05) * this.slow;
-    // y-sort by feet. In slow-mo he's lifted over the darkening and his own light (SpeedFx), so he stays in full colour.
-    // shortcut: that also draws him over tree tops and roofs while it lasts; sort him under Above if it shows.
-    s.setDepth(this.slowmo ? DEPTH.effects - 2.5 : DEPTH.actors + s.y);
+    // y-sort by feet. In slow-mo he's lifted over the darkening and his own light (SpeedFx), so he stays in full colour;
+    // the dogs are lifted the same way (DogAI.update) and sorted with him, so a dog in front of him draws in front.
+    // shortcut: that also draws them over tree tops and roofs while it lasts; sort them under Above if it shows.
+    s.setDepth(this.slowmo ? DEPTH.effects - 2.5 + s.y * 1e-5 : DEPTH.actors + s.y);
     // Invincibility frames show as flicker.
     s.setAlpha(this.party.health[this.party.activeIndex].invulnerable && Math.floor(this.time.now / 60) % 2 ? 0.3 : 1);
     const { sprite } = this.party.active;
@@ -550,14 +555,18 @@ export class LevelScene extends Phaser.Scene {
    * The bolts at the screen edges are the HUD's.
    */
   private drawSlowmo(s: CharSprite) {
-    const k = this.slowmo && tuning.slowmo < 1 ? Phaser.Math.Clamp((1 - this.slow) / (1 - tuning.slowmo), 0, 1) : 0;
+    // The world's speed snaps back at once, but the look fades out over FADE_OUT ms so the colour doesn't pop.
+    const look = this.slowLook, k = this.slowmo && tuning.slowmo < 1
+      ? (look.k = Phaser.Math.Clamp((1 - this.slow) / (1 - tuning.slowmo), 0, 1))
+      : look.k * Math.max(0, 1 - (this.time.now - look.endedAt) / FADE_OUT);
     this.shade.setVisible(k > 0);
     this.vignette.setActive(k > 0);
     this.speedFx.update(this.time.now, s, k, { bolts: tuning.speedLightning > 0, gap: tuning.ghostGap, streak: tuning.streak > 0 });
     if (!k) return;
     const view = this.cameras.main.worldView, c = Phaser.Display.Color.Interpolate.ColorWithColor(Phaser.Display.Color.ValueToColor(0xffffff), Phaser.Display.Color.ValueToColor(SLOWMO.shade), 1, k);
     this.shade.setPosition(view.x - 8, view.y - 8).setSize(view.width + 16, view.height + 16).setFillStyle(Phaser.Display.Color.GetColor(c.r, c.g, c.b));
-    this.vignette.strength = SLOWMO.edgeGlow * k * (0.85 + 0.15 * Math.sin(this.time.now / 60)); // pulses
+    const ending = (this.party.abilities.find((a) => a?.active)?.left ?? 9) < 1; // last second: pulse fast, a warning
+    this.vignette.strength = SLOWMO.edgeGlow * k * (ending ? 0.7 + 0.3 * Math.sin(this.time.now / 25) : 0.85 + 0.15 * Math.sin(this.time.now / 60));
   }
 
   /** Our shader filters (shader blueprint §7): the shockwave ring and the heat haze behind Christian. Positions are screen px. */

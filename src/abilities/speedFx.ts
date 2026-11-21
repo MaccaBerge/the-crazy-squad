@@ -39,7 +39,7 @@ export class SpeedFx {
       }
       tex.refresh();
     }
-    this.light = scene.add.image(0, 0, LIGHT).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.effects - 2.75).setScale(3.5).setTint(SLOWMO.orange).setVisible(false);
+    this.light = scene.add.image(0, 0, LIGHT).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.effects - 2.75).setScale(2.25).setTint(SLOWMO.orange).setVisible(false);
   }
 
   /**
@@ -125,7 +125,7 @@ export class SpeedFx {
     }
     if (s.body.velocity.length() > 10) this.poses.push({ x: s.x, y: s.y, frame: s.frame.name, flip: s.flipX, t: now });
     this.poses = this.poses.filter((p) => now - p.t < STREAK_MS);
-    const cx = Math.round(s.x), cy = Math.round(s.y - STREAK_H / 4), left = cx - STREAK_W / 2, top = cy - STREAK_H / 2;
+    const cx = Math.round(s.x), cy = Math.round(s.y - 16), left = cx - STREAK_W / 2, top = cy - STREAK_H / 2;
     const rt = this.streak.setVisible(true).setPosition(cx, cy).setDepth(s.depth - 0.5).setAlpha(k).clear();
     this.poses.forEach((p, i) => {
       const stamp = (this.stamps[i] ??= new Phaser.GameObjects.Image(this.scene, 0, 0, s.texture.key).setOrigin(0.5, 1).setTintMode(Phaser.TintModes.FILL));
@@ -137,4 +137,4 @@ export class SpeedFx {
 }
 
 const STREAK_MS = 380; // how far back the merged afterimage reaches
-const STREAK_W = 192, STREAK_H = 96; // px: room for the streak at top slow-mo speed in any direction
+const STREAK_W = 192, STREAK_H = 192; // px, centred on his middle: room for the ~70 px streak in any direction

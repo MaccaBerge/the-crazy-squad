@@ -11,8 +11,8 @@ export const SLOWMO = {
   orange: 0xe3723c, // outer glow, the light round him, the glowing screen edges
   red: 0xb6201f, // the widest, faintest glow: the suit's red
   zoom: 1.12, // camera zoom in while it lasts
-  shade: 0x8c5f55, // the world is multiplied by this (warm and dark) under the lightning, so the light blazes
-  edgeGlow: 0.35, // strength of the orange glow at the screen edges
+  shade: 0x5a4a55, // the world is multiplied by this (dark, a little cool) under the lightning, so his light and the lightning blaze
+  edgeGlow: 0.22, // strength of the orange glow at the screen edges
 };
 
 /** A lightning bolt: the main channel and the forks off it. */
