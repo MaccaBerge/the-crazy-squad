@@ -39,7 +39,7 @@ export class SpeedFx {
       }
       tex.refresh();
     }
-    this.light = scene.add.image(0, 0, LIGHT).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.effects - 2.75).setScale(3.5).setTint(SLOWMO.orange).setVisible(false);
+    this.light = scene.add.image(0, 0, LIGHT).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.effects - 2.75).setScale(2.25).setTint(SLOWMO.orange).setVisible(false);
   }
 
   /**
