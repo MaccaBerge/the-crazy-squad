@@ -61,8 +61,8 @@ export class SpeedFx {
       for (let strand = 0; strand < 3; strand++) {
         for (let i = 1; i < pts.length; i++) {
           const a = pts[i - 1], b = pts[i], fade = 1 - (now - a.t) / TRAIL_MS;
-          const w = (p: Vec, j: number) => ({ x: p.x + (Math.random() * 2 - 1) * 4 * (1 - j * 0.5), y: p.y + (strand - 1) * 4 + (Math.random() * 2 - 1) * 4 });
-          drawLightning(glow, core, lightning(w(a, 0), w(b, 1), { depth: 2, jag: 0.35, fork: 0.1 }), k * fade * (strand === 1 ? 1 : 0.75));
+          const w = (p: Vec, j: number) => ({ x: p.x + (Math.random() * 2 - 1) * 2 * (1 - j * 0.5), y: p.y + (strand - 1) * 3 + (Math.random() * 2 - 1) * 2 });
+          drawLightning(glow, core, lightning(w(a, 0), w(b, 1), { depth: 2, jag: 0.35, fork: 0.1 }), k * fade * (strand === 1 ? 1 : 0.75), { thin: true });
         }
       }
     }
@@ -80,14 +80,14 @@ export class SpeedFx {
     this.arcs = this.arcs.filter((a) => now - a.born < a.life);
     for (const a of this.arcs) {
       const flick = Math.random() < 0.15 ? 0.3 : 1; // the odd frame dims, so it crackles
-      drawLightning(glow, core, a.l, k * flick * (1 - (now - a.born) / a.life), { at: chest });
+      drawLightning(glow, core, a.l, k * flick * (1 - (now - a.born) / a.life), { at: chest, thin: true });
     }
 
     // Afterimages: additive orange copies of him that fade fast, under the lightning.
     if (moving && now >= this.nextGhost) {
       this.nextGhost = now + 45;
       const ghost = this.scene.add.image(s.x, s.y, s.texture.key, s.frame.name).setOrigin(0.5, 1).setFlipX(s.flipX).setDepth(s.depth - 0.5)
-        .setTint(SLOWMO.orange).setTintMode(Phaser.TintModes.FILL).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.4 * k);
+        .setTint(SLOWMO.orange).setTintMode(Phaser.TintModes.FILL).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.2 * k);
       this.scene.tweens.add({ targets: ghost, alpha: 0, duration: 200, onComplete: () => ghost.destroy() });
     }
   }

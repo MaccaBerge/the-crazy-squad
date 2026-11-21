@@ -49,14 +49,14 @@ const px = (ps: Vec[], o: Vec) => ps.map((p) => ({ x: Math.round(p.x + o.x), y: 
 /**
  * Draws a bolt as the suit ramp, outside in: wide faint red, orange, gold, then a 1 px pale core. `glow` should be an
  * additive (ADD) graphics, so overlapping bolts get brighter like real light; `core` a normal one on top.
- * Points snap to whole pixels, so it stays pixel art at the game's resolution.
+ * Points snap to whole pixels, so it stays pixel art at the game's resolution. `thin` halves the glow round the core.
  */
-export function drawLightning(glow: G, core: G, l: Lightning, alpha: number, { thick = 1, at = { x: 0, y: 0 } } = {}) {
-  const main = px(l.main, at), forks = l.forks.map((f) => px(f, at));
-  glow.lineStyle(thick + 4, SLOWMO.red, 0.22 * alpha).strokePoints(main);
-  glow.lineStyle(thick + 2, SLOWMO.orange, 0.45 * alpha).strokePoints(main);
-  for (const f of forks) glow.lineStyle(thick + 1, SLOWMO.orange, 0.4 * alpha).strokePoints(f);
-  glow.lineStyle(thick + 1, SLOWMO.gold, 0.7 * alpha).strokePoints(main);
+export function drawLightning(glow: G, core: G, l: Lightning, alpha: number, { thick = 1, thin = false, at = { x: 0, y: 0 } } = {}) {
+  const main = px(l.main, at), forks = l.forks.map((f) => px(f, at)), spread = thin ? 1 : 2;
+  glow.lineStyle(thick + spread * 2, SLOWMO.red, 0.22 * alpha).strokePoints(main);
+  glow.lineStyle(thick + spread, SLOWMO.orange, 0.45 * alpha).strokePoints(main);
+  if (!thin) for (const f of forks) glow.lineStyle(thick + 1, SLOWMO.orange, 0.4 * alpha).strokePoints(f);
+  if (!thin) glow.lineStyle(thick + 1, SLOWMO.gold, 0.7 * alpha).strokePoints(main);
   core.lineStyle(thick, SLOWMO.core, alpha).strokePoints(main);
   for (const f of forks) core.lineStyle(1, SLOWMO.gold, 0.85 * alpha).strokePoints(f);
 }
