@@ -53,6 +53,7 @@ export const tuning = {
   warnRange: 160, // px a dog that's after you warns packmates across, even ones that can't see you
   packRing: 18, // px from you to each hunting dog's spot in the ring (inside their reach, so they can still bite)
   slowmo: 0.3, // world speed during Christian's slow-mo (everything but him)
+  slowmoSpeed: 1.6, // and his own speed and acceleration then, so he looks even faster next to the slowed world
   ...WEATHER[DEFAULT_WEATHER], // replaced by the map's weather on load
 };
 
@@ -285,6 +286,7 @@ export class LevelScene extends Phaser.Scene {
       return;
     }
     const p = this.moveParams(this.party.active, this.sprinting && !this.swing);
+    if (this.slowmo) (p.maxSpeed *= tuning.slowmoSpeed), (p.accel *= tuning.slowmoSpeed); // legs speed up too: animation follows speed
     if (this.swing) p.maxSpeed *= ATTACK_SLOW;
     // Exhausted (bar just ran dry): walk slower. Animation speed still compares to the normal walk, so the legs look heavy.
     p.maxSpeed *= this.party.stamina[this.party.activeIndex].speedFactor;
