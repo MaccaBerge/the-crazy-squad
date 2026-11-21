@@ -112,20 +112,58 @@ Start with direct steering only, and add A\* once walls trap dogs in the first r
 
 ## 7. Breeds
 
-Placeholder ideas to tune or replace:
+The first five dogs, picked from the concept sheet. Their art is in `art/dogs/` (PixelLab, 32×32, 8 directions, Marcus's style). They hold **no weapons**: guns, the shield, the club and the bombs are separate sprites placed by code, so they can aim freely, recoil and telegraph.
 
-| Breed | Role | Stats | Attacks | Special |
-|---|---|---|---|---|
-| **Chihuahua** | Swarm | Fast, low HP, light | Nip (short windup) | Comes in groups, flees when alone at low HP |
-| **Bulldog** | Tank | Slow, high HP, heavy (barely pushed) | **Charge** (long windup, then a straight dash). It's stunned for a moment if it hits a wall. | Takes a heavy token. Teaches "dodge sideways". |
-| **Dachshund** | Flanker | Medium | Bite | Squeezes through small gaps to come from unexpected sides |
-| **Boss dog** | Boss | Per design | Several attack patterns | Phases (section 8) |
+| Dog | Role | Attacks | Special |
+|---|---|---|---|
+| **Heavy Gunner** (Rottweiler) | Tank, dangerous up close | Pump shotgun: a wide, short cone. Slow pump between shots. | Barely knocked back. Never runs; slow and heavy is the threat. |
+| **K-9 Cop** (German Shepherd) | Blocker | Baton swing; shield bash when you get close | The riot shield blocks shots from the front. He turns slowly, so you flank him. |
+| **Long Shot** (Dachshund) | Sniper | Sniper rifle. A red laser line shows his aim before he fires. | Hides far away and backs off when you close in. |
+| **Bruiser** (Bulldog) | Charger | **Charge:** a long wind-up, then a straight dash. Club swing up close. | Can't steer while charging. **Dizzy** for a moment if he hits a wall: your window to punish him. Takes a heavy token. |
+| **Mad Bomber** (Pug) | Area denial | Lobs a lit bomb in an arc over cover. A ground circle and a faster-blinking fuse warn where it lands. | Small and quick, keeps away. You hear his snort (a noise event) before you see him. |
+
+Later ideas: a **Chihuahua** swarm (fast, fragile, always in packs) and a **boss dog** with phases (section 8).
+
+### 7.1 Speed and traits
+
+Like the squad's `stats`, dog speeds are **multipliers** on one shared movement tuning, so the T panel still tunes them all at once. Size sets the starting point; traits can break it (the pug is the smallest and the fastest).
+
+| Dog | Speed | Accel | Traits |
+|---|---|---|---|
+| Heavy Gunner | 0.7 | 0.5 | `heavy` (barely pushed), `noRun` |
+| K-9 Cop | 1.0 | 1.0 | `shieldFront`, slow `turnRate` |
+| Long Shot | 0.8 | 0.8 | `keepsDistance` |
+| Bruiser | 0.8 (2.0 charging) | 0.7 | `heavy`, `chargeLocksSteering`, `dizzyOnWall` |
+| Mad Bomber | 1.15 | 1.3 | `keepsDistance`, `snorts` |
+
+All numbers are starting points for tuning in play.
+
+### 7.2 Animations
+
+Every dog shares a set of moves, plus one to three of its own for its attack. Only the **body** is animated in PixelLab; weapons, muzzle flash, recoil, bombs and lasers are code. Getting hit starts as code too (a white flash and knockback).
+
+| Animation | Who | PixelLab clip |
+|---|---|---|
+| Idle | All | `breathing-idle` |
+| Walk (played faster, it's also the jog) | All | `walking` |
+| Run | All but the Heavy Gunner | `running-6-frames` |
+| Death | All | `falling-back-death` |
+| Heavy, stomping walk (replaces his walk) | Heavy Gunner | custom |
+| Shield bash: a short lunge | K-9 Cop | custom |
+| Crouch-aim and crouched sneak | Long Shot | `crouching`, `crouched-walking` |
+| Charge wind-up, charge, dizzy | Bruiser | custom, `running-8-frames`, custom |
+| Throw and panicked backpedal | Mad Bomber | `throw-object`, custom |
+
+**Directions:** like the squad, only 5 are generated (south, south-east, east, north-east, north) and the left-facing ones are mirrored.
+
+**Cost:** ready-made clips cost 1 generation per direction, and custom ones about 1 at 32 px, so about 5 generations per animation. The shared set is 19 animations (95) and the unique ones 9 (45): **about 140 generations** for all five dogs.
 
 ```ts
 // src/dogs/types.ts
 type BreedDef = {
   id: string; sprite: string;
-  stats: { maxHp: number; speed: number; accel: number; decel: number; mass: number };
+  stats: { maxHp: number; speed: number; accel: number; decel: number; mass: number }; // speed and accel are multipliers (7.1)
+  traits: string[];              // e.g. 'heavy', 'keepsDistance' (7.1)
   body: { w: number; h: number }; hurtbox: { w: number; h: number };
   mover: 'walker' | 'small' | 'flyer';
   senses: { sight: number; hearing: number; cone?: number };
@@ -187,10 +225,11 @@ src/
 
 ## 12. Build order
 
-1. **First dog (chihuahua):** `DogAI` with idle → alert → chase → windup → attack → recover, direct steering, sight without walls, one nip ability, and the debug labels.
+0. **Dog animations:** the shared set for all five, then the unique ones (7.2), built into sheets like the squad's.
+1. **First dog:** `DogAI` with idle → alert → chase → windup → attack → recover, direct steering, sight without walls, one simple attack, and the debug labels.
 2. **A small pack:** separation steering, attack tokens with hover rings, barks, and sight blocked by walls.
 3. **First real level:** patrol paths, investigate and noise, leash and return, A\*.
-4. **More breeds:** bulldog charge with the heavy token, then dachshund squeezing.
+4. **The rest of the five:** Bruiser charge with the heavy token, then K-9 Cop's shield, Long Shot's laser and Mad Bomber's lobbed bombs.
 5. **Big fights:** flow field, wave spawner, the first boss with phases.
 
 ---
