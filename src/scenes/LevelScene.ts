@@ -542,7 +542,8 @@ export class LevelScene extends Phaser.Scene {
     if (!k) return;
     const view = this.cameras.main.worldView, c = Phaser.Display.Color.Interpolate.ColorWithColor(Phaser.Display.Color.ValueToColor(0xffffff), Phaser.Display.Color.ValueToColor(SLOWMO.shade), 1, k);
     this.shade.setPosition(view.x - 8, view.y - 8).setSize(view.width + 16, view.height + 16).setFillStyle(Phaser.Display.Color.GetColor(c.r, c.g, c.b));
-    this.vignette.strength = SLOWMO.edgeGlow * k * (0.85 + 0.15 * Math.sin(this.time.now / 60)); // pulses
+    const ending = (this.party.abilities.find((a) => a?.active)?.left ?? 9) < 1; // last second: pulse fast, a warning
+    this.vignette.strength = SLOWMO.edgeGlow * k * (ending ? 0.7 + 0.3 * Math.sin(this.time.now / 25) : 0.85 + 0.15 * Math.sin(this.time.now / 60));
   }
 
   /** Placeholder for the wrench: a pale arc sweeping across the front during the active part, fading in recovery. */

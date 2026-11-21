@@ -123,7 +123,7 @@ export class HudScene extends Phaser.Scene {
       const secs = String(Math.ceil(a.cooldownLeft));
       [...secs].forEach((d, i) => drawDigit(g, d, x + SLOT / 2 - secs.length * 2 + i * 4, y + SLOT / 2 - 2));
     }
-    if (a.active) {
+    if (a.active && !(a.left < 1 && Math.floor(this.time.now / 100) % 2)) { // blinks in the last second: about to snap back
       g.fillStyle(SLOWMO.gold).fillRect(x + 1, y + SLOT - 3, Math.max(1, Math.round((SLOT - 2) * (a.left / a.def.duration))), 2);
     }
     const flash = 1 - (now - this.readyAt) / READY_FLASH;
