@@ -22,11 +22,10 @@ test('presses are buffered, expire, and fire once when consumed', () => {
   expect(c.getIntent(2000).pressed.has('swap3')).toBe(false);
 });
 
-test('Q swaps back, E swaps forward, also while sprinting', () => {
+test('E uses the ability, also while sprinting', () => {
   const c = new LocalController();
-  c.keyDown('KeyQ', false, 0);
   c.keyDown('KeyE', true, 0);
-  expect([...c.getIntent(0).pressed].sort()).toEqual(['swapNext', 'swapPrev']);
+  expect([...c.getIntent(0).pressed]).toEqual(['ability1']);
 });
 
 test('clear releases everything (window lost focus)', () => {

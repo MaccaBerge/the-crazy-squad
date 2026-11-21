@@ -29,6 +29,8 @@ import type { Vec } from '../movement';
 import { comboStep, inArc, type Swing, swingPhase } from '../combat/swing';
 import { ringSlots, separation } from '../ai/separation';
 import { HUNTING } from '../ai/dogBrain';
+import { SLOWMO } from '../abilities/slowmo';
+import { SpeedFx } from '../abilities/speedFx';
 
 const MAP = new URLSearchParams(location.search).get('map') ?? 'test'; // dev: ?map=backyard
 // Dev: ?grass=20000 covers the map in that many blades, with an fps readout (nature blueprint §8, step 2).
@@ -36,6 +38,8 @@ const STRESS_BLADES = Number(new URLSearchParams(location.search).get('grass')) 
 const NUDGE_SPEED = 0.6; // corner assist sideways speed, as a share of top speed
 const HURT = 0.18; // seconds a hit pushes you around before your input counts again
 const SPARK = 140; // ms a hit spark lasts
+const FADE_OUT = 120; // ms the slow-mo look takes to fade when it ends
+const SLOW_IN = 0.12; // s for the world to ease down into slow-mo (it snaps back at the end)
 const ATTACK_SLOW = 0.4; // share of walking speed while swinging: you can creep, not run (combat blueprint §3)
 
 /** Live-tunable values (T panel). Character stats multiply the movement values. */
@@ -49,6 +53,12 @@ export const tuning = {
   packSpace: 22, packPush: 1.5, // px dogs keep between them, and how hard they steer apart
   warnRange: 160, // px a dog that's after you warns packmates across, even ones that can't see you
   packRing: 18, // px from you to each hunting dog's spot in the ring (inside their reach, so they can still bite)
+  slowmo: 0.3, // world speed during Christian's slow-mo (everything but him)
+  slowmoSpeed: 1.6, // and his own speed and acceleration then, so he looks even faster next to the slowed world
+  speedLightning: 0, // 1: lightning off his body and along his trail during slow-mo; 0: afterimages only (testing)
+  streak: 0, // 1: the afterimage is one merged shape with a colour and fade gradient; 0: separate copies, ghostGap apart
+  boltGrow: 240, boltLinger: 160, boltEvery: 70, // edge lightning: ms to grow (big ones 1.5×), ms it lingers after (to 2×), ms between new ones (to ~2×)
+  ghostGap: 2, // px between afterimages: 2 blends them into one smooth streak, 10 or 14 shows separate figures
   ...WEATHER[DEFAULT_WEATHER], // replaced by the map's weather on load
 };
 
@@ -97,6 +107,14 @@ export class LevelScene extends Phaser.Scene {
   private frozenUntil = 0;
   private knock: Vec = { x: 0, y: 0 };
   private readout?: HTMLDivElement;
+  private slowmo = false; // Christian's slow-mo is running
+  private slow = 1; // world speed now: eases down to tuning.slowmo while slow-mo runs
+  private slowLook = { k: 0, endedAt: -Infinity }; // the look's strength when it ended, so it fades out instead of popping
+  private worldT = 0; // s of world time, the clock nature runs on: slowed in slow-mo
+  private shade!: Phaser.GameObjects.Rectangle; // darkens the world, but not the lightning drawn above it
+  private vignette!: Phaser.Filters.Vignette;
+  private baseZoom = 1;
+  private speedFx!: SpeedFx;
 
   constructor() {
     super('level');
@@ -122,6 +140,10 @@ export class LevelScene extends Phaser.Scene {
     this.combo = { step: -1, since: 0 };
     this.sparks = [];
     this.frozenUntil = 0;
+    this.slowmo = false;
+    this.slow = 1;
+    this.slowLook = { k: 0, endedAt: -Infinity };
+    this.worldT = 0;
     const { map, layers, colliders } = loadMap(this, MAP);
     const weather = (map.properties as { name: string; value: unknown }[]).find((p) => p.name === 'weather')?.value;
     Object.assign(tuning, WEATHER[isWeather(weather) ? weather : DEFAULT_WEATHER]);
@@ -202,6 +224,12 @@ export class LevelScene extends Phaser.Scene {
 
     // Dev: the mouse wheel or -/+ zooms the view out and in, 0 resets. For testing only: below 1× the pixels shimmer.
     const cam = this.cameras.main;
+    this.speedFx = new SpeedFx(this);
+    // Slow-mo's look: the world darkens under the lightning and the screen edges glow orange. Off until it runs
+    // (filters cleared first: a restart reuses the camera).
+    this.shade = this.add.rectangle(0, 0, 1, 1, 0xffffff).setOrigin(0).setDepth(DEPTH.effects - 3).setBlendMode(Phaser.BlendModes.MULTIPLY).setVisible(false);
+    cam.filters.internal.clear();
+    this.vignette = cam.filters.internal.addVignette(0.5, 0.5, 0.9, 0, SLOWMO.orange, Phaser.BlendModes.ADD).setActive(false);
     const zoomTo = (z: number) => cam.setZoom(Phaser.Math.Clamp(z, 0.25, 3));
     this.input.on('wheel', (_p: unknown, _o: unknown, _dx: number, dy: number) => zoomTo(cam.zoom * Math.exp(-dy * 0.002))); // smooth on trackpads too
     this.input.keyboard!.on('keydown-MINUS', () => zoomTo(cam.zoom / 1.25));
@@ -229,6 +257,15 @@ export class LevelScene extends Phaser.Scene {
     this.sprinting = this.party.tick(dt, intent.sprint && moving);
     const swap = SWAP_ACTIONS.find((a) => intent.pressed.has(a));
     if (swap) this.trySwap(swap);
+    const ability = this.party.abilities[this.party.activeIndex];
+    // A press on the cooldown stays buffered, like swapping; one with no ability to use is dropped.
+    if (intent.pressed.has('ability1') && (!ability || ability.start())) {
+      this.controller.consume('ability1');
+      if (ability?.def.id === 'slowmo') this.startSlowmo();
+    }
+    if (this.slowmo && !this.party.abilities.some((a) => a?.active)) this.endSlowmo();
+    this.slow = this.slowmo ? this.slow + (tuning.slowmo - this.slow) * Math.min(1, dt / SLOW_IN) : 1;
+    for (const d of this.brains) d.timeScale = this.slow;
 
     const s = this.active;
     const pack = this.brains.filter((d) => !d.out), feet = pack.map((d) => d.sprite);
@@ -256,6 +293,7 @@ export class LevelScene extends Phaser.Scene {
       return;
     }
     const p = this.moveParams(this.party.active, this.sprinting && !this.swing);
+    if (this.slowmo) (p.maxSpeed *= tuning.slowmoSpeed), (p.accel *= tuning.slowmoSpeed); // legs speed up too: animation follows speed
     if (this.swing) p.maxSpeed *= ATTACK_SLOW;
     // Exhausted (bar just ran dry): walk slower. Animation speed still compares to the normal walk, so the legs look heavy.
     p.maxSpeed *= this.party.stamina[this.party.activeIndex].speedFactor;
@@ -316,6 +354,29 @@ export class LevelScene extends Phaser.Scene {
     world.pause(); // update() resumes it
   }
 
+  /** Christian's slow-mo starts: a beat of freeze, then the camera pushes in while the world winds down. */
+  private startSlowmo() {
+    this.slowmo = true;
+    this.freeze(80);
+    const cam = this.cameras.main;
+    this.tweens.killTweensOf(cam);
+    this.baseZoom = cam.zoom;
+    this.tweens.add({ targets: cam, zoom: this.baseZoom * SLOWMO.zoom, duration: 250, ease: 'Cubic.Out' });
+  }
+
+  /** Time snaps back (ran out, or swapped out): the camera snaps out with a shake. */
+  private endSlowmo() {
+    this.slowmo = false;
+    this.slowLook.endedAt = this.time.now;
+    this.slow = 1;
+    for (const a of this.party.abilities) a?.end();
+    for (const d of this.brains) d.timeScale = 1;
+    const cam = this.cameras.main;
+    this.tweens.killTweensOf(cam);
+    this.tweens.add({ targets: cam, zoom: this.baseZoom, duration: 160, ease: 'Cubic.In' });
+    cam.shake(100, 0.004);
+  }
+
   /** Dev spawn: the next breed, on the first free spot about 4 tiles from you. */
   private spawnDog() {
     const kind = DOG_KINDS[this.spawned++ % DOG_KINDS.length], breed = BREEDS[kind];
@@ -358,6 +419,7 @@ export class LevelScene extends Phaser.Scene {
     const to = this.active;
     const { x: vx, y: vy } = from.body.velocity;
     this.swing = undefined; // swapping cancels whatever the old one was doing
+    if (this.slowmo) this.endSlowmo(); // slow-mo is Christian's alone
     this.combo = { step: -1, since: 0 };
     offStage(from);
     onStage(to, from.x, from.y);
@@ -408,7 +470,12 @@ export class LevelScene extends Phaser.Scene {
       this.physics.world.resume();
     }
     const s = this.active;
-    s.setDepth(DEPTH.actors + s.y); // y-sort by feet
+    this.worldT += (delta / 1000) * this.slow;
+    const worldDt = Math.min(delta / 1000, 0.05) * this.slow;
+    // y-sort by feet. In slow-mo he's lifted over the darkening and his own light (SpeedFx), so he stays in full colour;
+    // the dogs are lifted the same way (DogAI.update) and sorted with him, so a dog in front of him draws in front.
+    // shortcut: that also draws them over tree tops and roofs while it lasts; sort them under Above if it shows.
+    s.setDepth(this.slowmo ? DEPTH.effects - 2.5 + s.y * 1e-5 : DEPTH.actors + s.y);
     // Invincibility frames show as flicker.
     s.setAlpha(this.party.health[this.party.activeIndex].invulnerable && Math.floor(this.time.now / 60) % 2 ? 0.3 : 1);
     const { sprite } = this.party.active;
@@ -435,21 +502,42 @@ export class LevelScene extends Phaser.Scene {
     this.rig.update(s.body.velocity, this.moveParams(this.party.active, this.sprinting).maxSpeed, delta / 1000);
     this.drawStamina(s, delta / 1000);
     this.drawSwing(s);
+    this.drawSlowmo(s);
     if (this.windView.visible) this.drawWind();
-    this.trees.update(this.time.now / 1000, delta / 1000, tuning, s);
-    this.leaves.update(this.time.now / 1000, Math.min(delta / 1000, 0.05), tuning);
-    this.hanging.update(this.time.now / 1000, Math.min(delta / 1000, 0.05), tuning);
+    this.trees.update(this.worldT, (delta / 1000) * this.slow, tuning, s);
+    this.leaves.update(this.worldT, worldDt, tuning);
+    this.hanging.update(this.worldT, worldDt, tuning);
     this.look.update(Math.min(delta / 1000, 0.05), tuning.light);
     this.dogs.face(this.active.x, this.active.y - 8);
     for (const d of this.brains) d.update(this.time.now, this.physics.world.drawDebug);
     if (this.grass) {
       const start = performance.now();
       const forces = [footForce(s.x, s.y, this.party.active.body.w)];
-      const changed = this.grass.update(this.cameras.main.worldView, this.time.now / 1000, delta / 1000, tuning, forces);
+      const changed = this.grass.update(this.cameras.main.worldView, this.worldT, (delta / 1000) * this.slow, tuning, forces);
       const ms = performance.now() - start;
       if (this.readout && this.game.getFrame() % 30 === 0)
         this.readout.textContent = `${STRESS_BLADES} blades · ${this.grass.pushed} pushed · ${changed} re-posed in ${ms.toFixed(2)} ms · ${this.game.loop.actualFps.toFixed(0)} fps`;
     }
+  }
+
+  /**
+   * Slow-mo on screen: the world darkens to a warm dusk under the lightning so it blazes, the screen edges glow orange, and
+   * SpeedFx puts the lightning, trail and light on Christian. All of it follows how far the world has slowed.
+   * The bolts at the screen edges are the HUD's.
+   */
+  private drawSlowmo(s: CharSprite) {
+    // The world's speed snaps back at once, but the look fades out over FADE_OUT ms so the colour doesn't pop.
+    const look = this.slowLook, k = this.slowmo && tuning.slowmo < 1
+      ? (look.k = Phaser.Math.Clamp((1 - this.slow) / (1 - tuning.slowmo), 0, 1))
+      : look.k * Math.max(0, 1 - (this.time.now - look.endedAt) / FADE_OUT);
+    this.shade.setVisible(k > 0);
+    this.vignette.setActive(k > 0);
+    this.speedFx.update(this.time.now, s, k, { bolts: tuning.speedLightning > 0, gap: tuning.ghostGap, streak: tuning.streak > 0 });
+    if (!k) return;
+    const view = this.cameras.main.worldView, c = Phaser.Display.Color.Interpolate.ColorWithColor(Phaser.Display.Color.ValueToColor(0xffffff), Phaser.Display.Color.ValueToColor(SLOWMO.shade), 1, k);
+    this.shade.setPosition(view.x - 8, view.y - 8).setSize(view.width + 16, view.height + 16).setFillStyle(Phaser.Display.Color.GetColor(c.r, c.g, c.b));
+    const ending = (this.party.abilities.find((a) => a?.active)?.left ?? 9) < 1; // last second: pulse fast, a warning
+    this.vignette.strength = SLOWMO.edgeGlow * k * (ending ? 0.7 + 0.3 * Math.sin(this.time.now / 25) : 0.85 + 0.15 * Math.sin(this.time.now / 60));
   }
 
   /** Placeholder for the wrench: a pale arc sweeping across the front during the active part, fading in recovery. */
@@ -502,7 +590,7 @@ export class LevelScene extends Phaser.Scene {
     const st = this.party.stamina[this.party.activeIndex];
     const g = this.staminaBar.clear();
     this.drawSweat(g, s, st.exhausted, dt);
-    if (st.value >= 1) return;
+    if (st.value >= 1 || this.slowmo) return; // slow-mo sprints for free: no bar
     const w = 14, x = Math.round(s.x - w / 2), y = Math.round(s.y + 2);
     const flashOff = st.exhausted && Math.floor(this.time.now / 150) % 2 === 1;
     g.fillStyle(flashOff ? 0x7a2a36 : 0x241520).fillRect(x - 1, y - 1, w + 2, 4);

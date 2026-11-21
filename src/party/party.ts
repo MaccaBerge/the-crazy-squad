@@ -1,9 +1,10 @@
 import type { CharacterDef } from '../characters/types';
+import { Ability } from '../abilities/ability';
 import { Health } from '../collision/hits';
 import type { Action } from '../input/actions';
 import { Stamina, type StaminaTuning } from './stamina';
 
-export const SWAP_ACTIONS = ['swapNext', 'swapPrev', 'swap1', 'swap2', 'swap3', 'swap4'] as const satisfies readonly Action[];
+export const SWAP_ACTIONS = ['swap1', 'swap2', 'swap3', 'swap4'] as const satisfies readonly Action[];
 export type SwapAction = (typeof SWAP_ACTIONS)[number];
 export type SwapResult = 'ok' | 'cooldown' | 'same' | 'no-room' | 'downed';
 
@@ -18,6 +19,9 @@ export class Party {
   readonly stamina: Stamina[];
   /** One per member, kept while off stage. A downed member (0 HP) stays out. */
   readonly health: Health[];
+  /** Each member's ability1, recharging while off stage (blueprint §5). */
+  readonly abilities: (Ability | undefined)[];
+  private wasActive: boolean[] = []; // each ability's state at the last tick, to notice it ending however it ended
 
   constructor(
     readonly members: readonly CharacterDef[],
@@ -26,6 +30,7 @@ export class Party {
   ) {
     this.stamina = members.map(() => new Stamina(tuning));
     this.health = members.map((m) => new Health(m.stats.maxHp));
+    this.abilities = members.map((m) => m.ability1 && new Ability(m.ability1));
   }
 
   get active() {
@@ -37,18 +42,26 @@ export class Party {
     return this.tuning.swapCooldown > 0 ? this.cooldownLeft / this.tuning.swapCooldown : 0;
   }
 
-  /** `sprinting`: the active member holds sprint while moving. Returns whether they actually sprint this step. */
+  /**
+   * `sprinting`: the active member holds sprint while moving. Returns whether they actually sprint this step.
+   * An ability that ended since the last tick (ran out or ended early) is noticed here.
+   */
   tick(dt: number, sprinting = false): boolean {
     this.cooldownLeft -= dt;
     if (this.cooldownLeft < 1e-6) this.cooldownLeft = 0; // float leftovers from many small steps
     for (const h of this.health) h.tick(dt);
-    return this.stamina.map((s, i) => s.tick(dt, sprinting && i === this.activeIndex))[this.activeIndex];
+    return this.stamina.map((s, i) => {
+      const a = this.abilities[i];
+      a?.tick(dt);
+      if (this.wasActive[i] && !a?.active && a?.def.freeSprint) s.empty(); // also when it was ended early (swapped out)
+      this.wasActive[i] = !!a?.active;
+      const own = sprinting && i === this.activeIndex;
+      return a?.active && a.def.freeSprint ? own : s.tick(dt, own); // free sprint: the bar waits
+    })[this.activeIndex];
   }
 
   /** The member index a swap action asks for. */
   targetFor(action: SwapAction): number {
-    if (action === 'swapNext') return this.nextStanding(1) ?? this.activeIndex;
-    if (action === 'swapPrev') return this.nextStanding(-1) ?? this.activeIndex;
     return Number(action.slice(4)) - 1;
   }
 

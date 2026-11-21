@@ -1,3 +1,4 @@
+import type { AbilityDef } from '../abilities/ability';
 import type { Swing } from '../combat/swing';
 
 export type CharacterId = 'marcus' | 'kristian' | 'christian' | 'jonas';
@@ -18,4 +19,6 @@ export type CharacterDef = {
    * shortcut: only melee swings so far; the others get theirs in later build steps.
    */
   attack?: Swing[];
+  /** Signature ability on E (blueprint §2). */
+  ability1?: AbilityDef;
 };
