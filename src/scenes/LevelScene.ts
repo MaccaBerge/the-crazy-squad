@@ -57,6 +57,7 @@ export const tuning = {
   slowmoSpeed: 1.6, // and his own speed and acceleration then, so he looks even faster next to the slowed world
   speedLightning: 0, // 1: lightning off his body and along his trail during slow-mo; 0: afterimages only (testing)
   streak: 0, // 1: the afterimage is one merged shape with a colour and fade gradient; 0: separate copies, ghostGap apart
+  boltGrow: 240, boltLinger: 160, boltEvery: 70, // edge lightning: ms to grow (big ones 1.5×), ms it lingers after (to 2×), ms between new ones (to ~2×)
   ghostGap: 2, // px between afterimages: 2 blends them into one smooth streak, 10 or 14 shows separate figures
   ...WEATHER[DEFAULT_WEATHER], // replaced by the map's weather on load
 };

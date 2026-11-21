@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { characterTexture, FRAME } from '../art/placeholders';
 import type { Party } from '../party/party';
 import { drawLightning, type Lightning, lightning, SLOWMO } from '../abilities/slowmo';
+import { tuning } from './LevelScene';
 
 const GAP = 4;
 const MARGIN = 4;
@@ -141,7 +142,7 @@ export class HudScene extends Phaser.Scene {
     if (left <= 0) return void (this.strikes = []);
     const w = this.scale.width, h = this.scale.height;
     if (now >= this.nextStrike) {
-      this.nextStrike = now + 70 + Math.random() * 80; // fewer, since each lives longer
+      this.nextStrike = now + tuning.boltEvery * (1 + Math.random() * 1.15);
       const side = Math.floor(Math.random() * 4), t = Math.random(), big = Math.random() < 0.12;
       // A point on that edge, the way into the screen from it, and the way along it.
       const at = [{ x: t * w, y: 0 }, { x: w, y: t * h }, { x: t * w, y: h }, { x: 0, y: t * h }][side];
@@ -150,7 +151,7 @@ export class HudScene extends Phaser.Scene {
       const sway = (Math.random() * 2 - 1) * 0.6, dir = crawl ? along : { x: inward.x + along.x * sway, y: inward.y + along.y * sway };
       const from = crawl ? { x: at.x + inward.x * (2 + Math.random() * 5), y: at.y + inward.y * (2 + Math.random() * 5) } : at;
       const to = { x: from.x + dir.x * len, y: from.y + dir.y * len };
-      this.strikes.push({ l: lightning(from, to, { depth: big ? 5 : 4, jag: crawl ? 0.12 : 0.22, fork: big ? 0.3 : 0.18 }), born: now, life: (big ? 600 : 400) + Math.random() * 200, grow: big ? 360 : 240, thick: 1 });
+      this.strikes.push({ l: lightning(from, to, { depth: big ? 5 : 4, jag: crawl ? 0.12 : 0.22, fork: big ? 0.3 : 0.18 }), born: now, life: tuning.boltGrow * (big ? 1.5 : 1) + tuning.boltLinger * (1 + Math.random()), grow: tuning.boltGrow * (big ? 1.5 : 1), thick: 1 });
     }
     this.strikes = this.strikes.filter((b) => now - b.born < b.life);
     if (left < 1 && Math.floor(now / 70) % 3 === 0) return;
