@@ -8,4 +8,6 @@ export const kristian: CharacterDef = {
   sprite: 'kristian',
   body: { w: 12, h: 6 },
   stats: { maxHp: 100, speed: 0.9, accel: 0.85 },
+  // Wrench swing: slow, wide, heavy knockback (combat blueprint §3). Radius 24 so he can reach a Bruiser winding up at 22.
+  attack: { damage: 30, windup: 0.15, active: 0.1, recovery: 0.35, radius: 24, arc: 120, knockback: 200, heavy: true },
 };

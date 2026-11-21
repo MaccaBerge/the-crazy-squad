@@ -61,3 +61,13 @@ export function clearLine(solid: SolidAt, a: Vec, b: Vec, body: { w: number; h: 
 
 /** Where a feet box stands to sit in the middle of a cell. */
 export const cellFeet = (c: Cell, bodyH: number): Vec => ({ x: c.x * TILE + TILE / 2, y: c.y * TILE + (TILE + bodyH) / 2 });
+
+/** Whether a straight line from a to b crosses no solid tile (sight, not movement: a thin ray, sampled every 4 px). */
+export function lineOfSight(solid: SolidAt, a: Vec, b: Vec): boolean {
+  const d = Math.hypot(b.x - a.x, b.y - a.y), n = Math.ceil(d / 4);
+  for (let i = 1; i < n; i++) {
+    const x = a.x + ((b.x - a.x) * i) / n, y = a.y + ((b.y - a.y) * i) / n;
+    if (solid(Math.floor(x / TILE), Math.floor(y / TILE))) return false;
+  }
+  return true;
+}
