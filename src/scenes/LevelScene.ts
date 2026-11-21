@@ -31,6 +31,9 @@ import { ringSlots, separation } from '../ai/separation';
 import { HUNTING } from '../ai/dogBrain';
 import { SLOWMO } from '../abilities/slowmo';
 import { SpeedFx } from '../abilities/speedFx';
+import { registerFilters } from '../fx/filters';
+import { Shimmer } from '../fx/shimmer';
+import { Shockwave, shockwaveAt } from '../fx/shockwave';
 
 const MAP = new URLSearchParams(location.search).get('map') ?? 'test'; // dev: ?map=backyard
 // Dev: ?grass=20000 covers the map in that many blades, with an fps readout (nature blueprint §8, step 2).
@@ -56,6 +59,8 @@ export const tuning = {
   slowmoSpeed: 1.6, // and his own speed and acceleration then, so he looks even faster next to the slowed world
   speedLightning: 0, // 1: lightning off his body and along his trail during slow-mo; 0: afterimages only (testing)
   streak: 1, // 1: the afterimage is one merged shape with a colour and fade gradient; 0: separate copies, ghostGap apart
+  fxShockwave: 1, waveRadius: 160, waveStrength: 4, waveMs: 450, // shader ring when slow-mo starts and ends (shader blueprint §6)
+  fxShimmer: 1, shimmerStrength: 1, // heat haze behind Christian while he runs in slow-mo
   ghostGap: 2, // px between afterimages: 2 blends them into one smooth streak, 10 or 14 shows separate figures
   ...WEATHER[DEFAULT_WEATHER], // replaced by the map's weather on load
 };
@@ -112,6 +117,9 @@ export class LevelScene extends Phaser.Scene {
   private vignette!: Phaser.Filters.Vignette;
   private baseZoom = 1;
   private speedFx!: SpeedFx;
+  private wave?: Shockwave; // undefined without WebGL: no shaders then
+  private shimmer?: Shimmer;
+  private waveFrom = { x: 0, y: 0, at: -Infinity, size: 1 }; // world point, start time, and 1 = full size
 
   constructor() {
     super('level');
@@ -226,6 +234,13 @@ export class LevelScene extends Phaser.Scene {
     this.shade = this.add.rectangle(0, 0, 1, 1, 0xffffff).setOrigin(0).setDepth(DEPTH.effects - 3).setBlendMode(Phaser.BlendModes.MULTIPLY).setVisible(false);
     cam.filters.internal.clear();
     this.vignette = cam.filters.internal.addVignette(0.5, 0.5, 0.9, 0, SLOWMO.orange, Phaser.BlendModes.ADD).setActive(false);
+    cam.filters.external.clear();
+    this.wave = this.shimmer = undefined;
+    this.waveFrom.at = -Infinity;
+    if (registerFilters(this.game)) {
+      this.shimmer = cam.filters.external.add(new Shimmer(cam)) as Shimmer;
+      this.wave = cam.filters.external.add(new Shockwave(cam)) as Shockwave;
+    }
     const zoomTo = (z: number) => cam.setZoom(Phaser.Math.Clamp(z, 0.25, 3));
     this.input.on('wheel', (_p: unknown, _o: unknown, _dx: number, dy: number) => zoomTo(cam.zoom * Math.exp(-dy * 0.002))); // smooth on trackpads too
     this.input.keyboard!.on('keydown-MINUS', () => zoomTo(cam.zoom / 1.25));
@@ -358,6 +373,12 @@ export class LevelScene extends Phaser.Scene {
     this.tweens.killTweensOf(cam);
     this.baseZoom = cam.zoom;
     this.tweens.add({ targets: cam, zoom: this.baseZoom * SLOWMO.zoom, duration: 250, ease: 'Cubic.Out' });
+    this.shockwave(this.active, 1);
+  }
+
+  /** A shader ring from a character's chest; `size` 1 is the full slow-mo start, smaller for lesser moments. */
+  private shockwave(s: CharSprite, size: number) {
+    this.waveFrom = { x: s.x, y: s.y - 13, at: this.time.now, size };
   }
 
   /** Time snaps back (ran out, or swapped out): every saved-up knockback lands at once, and the camera snaps out. */
@@ -376,6 +397,7 @@ export class LevelScene extends Phaser.Scene {
     this.tweens.killTweensOf(cam);
     this.tweens.add({ targets: cam, zoom: this.baseZoom, duration: 160, ease: 'Cubic.In' });
     cam.shake(landed ? 160 : 100, landed ? 0.008 : 0.004);
+    this.shockwave(this.active, 0.6); // time snapping back: smaller and quicker
     if (landed) this.freeze(tuning.heavyHitstop);
   }
 
@@ -504,6 +526,7 @@ export class LevelScene extends Phaser.Scene {
     this.drawStamina(s, delta / 1000);
     this.drawSwing(s);
     this.drawSlowmo(s);
+    this.drawShaders(s);
     if (this.windView.visible) this.drawWind();
     this.trees.update(this.worldT, (delta / 1000) * this.slow, tuning, s);
     this.leaves.update(this.worldT, worldDt, tuning);
@@ -535,6 +558,26 @@ export class LevelScene extends Phaser.Scene {
     const view = this.cameras.main.worldView, c = Phaser.Display.Color.Interpolate.ColorWithColor(Phaser.Display.Color.ValueToColor(0xffffff), Phaser.Display.Color.ValueToColor(SLOWMO.shade), 1, k);
     this.shade.setPosition(view.x - 8, view.y - 8).setSize(view.width + 16, view.height + 16).setFillStyle(Phaser.Display.Color.GetColor(c.r, c.g, c.b));
     this.vignette.strength = SLOWMO.edgeGlow * k * (0.85 + 0.15 * Math.sin(this.time.now / 60)); // pulses
+  }
+
+  /** Our shader filters (shader blueprint §7): the shockwave ring and the heat haze behind Christian. Positions are screen px. */
+  private drawShaders(s: CharSprite) {
+    if (!this.wave || !this.shimmer) return;
+    const cam = this.cameras.main, view = cam.worldView, now = this.time.now;
+    const screen = (x: number, y: number) => [(x - view.x) * cam.zoom, (y - view.y) * cam.zoom];
+    const w = this.waveFrom, t = (now - w.at) / (tuning.waveMs * (0.5 + 0.5 * w.size));
+    this.wave.setActive(tuning.fxShockwave > 0 && t >= 0 && t < 1);
+    if (this.wave.active) {
+      const { radius, strength } = shockwaveAt(t, tuning.waveRadius * w.size, tuning.waveStrength * w.size);
+      [this.wave.x, this.wave.y] = screen(w.x, w.y);
+      Object.assign(this.wave, { radius: radius * cam.zoom, strength, thickness: 10 * cam.zoom });
+    }
+    const v = s.body.velocity, speed = v.length();
+    this.shimmer.setActive(tuning.fxShimmer > 0 && this.slowmo && speed > 10);
+    if (this.shimmer.active) {
+      [this.shimmer.x, this.shimmer.y] = screen(s.x - (v.x / speed) * 14, s.y - 12 - (v.y / speed) * 14); // just behind him
+      Object.assign(this.shimmer, { radius: 18 * cam.zoom, strength: tuning.shimmerStrength * Math.min(1, speed / 150), time: now / 1000 });
+    }
   }
 
   /** Placeholder for the wrench: a pale arc sweeping across the front during the active part, fading in recovery. */
