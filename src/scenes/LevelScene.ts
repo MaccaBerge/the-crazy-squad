@@ -63,7 +63,6 @@ export const tuning = {
   fxShockwave: 1, waveRadius: 160, waveStrength: 4, waveMs: 450, // shader ring when slow-mo starts and ends (shader blueprint §6)
   fxShimmer: 1, shimmerStrength: 1, // heat haze behind Christian while he runs in slow-mo
   boltGrow: 240, boltLinger: 160, boltEvery: 70, // edge lightning: ms to grow (big ones 1.5×), ms it lingers after (to 2×), ms between new ones (to ~2×)
-  speedGlow: 0, // 1: the warm light rings round Christian in slow-mo; 0: off (testing without them)
   ghostGap: 2, // px between afterimages: 2 blends them into one smooth streak, 10 or 14 shows separate figures
   ...WEATHER[DEFAULT_WEATHER], // replaced by the map's weather on load
 };
@@ -495,7 +494,7 @@ export class LevelScene extends Phaser.Scene {
     const s = this.active;
     this.worldT += (delta / 1000) * this.slow;
     const worldDt = Math.min(delta / 1000, 0.05) * this.slow;
-    // y-sort by feet. In slow-mo he's lifted over the darkening and his own light (SpeedFx), so he stays in full colour;
+    // y-sort by feet. In slow-mo he's lifted over the darkening, so he stays in full colour;
     // the dogs are lifted the same way (DogAI.update) and sorted with him, so a dog in front of him draws in front.
     // shortcut: that also draws them over tree tops and roofs while it lasts; sort them under Above if it shows.
     s.setDepth(this.slowmo ? DEPTH.effects - 2.5 + s.y * 1e-5 : DEPTH.actors + s.y);
@@ -546,7 +545,7 @@ export class LevelScene extends Phaser.Scene {
 
   /**
    * Slow-mo on screen: the world darkens to a warm dusk under the lightning so it blazes, the screen edges glow orange, and
-   * SpeedFx puts the lightning, trail and light on Christian. All of it follows how far the world has slowed.
+   * SpeedFx puts the lightning, trail and afterimages on Christian. All of it follows how far the world has slowed.
    * The bolts at the screen edges are the HUD's.
    */
   private drawSlowmo(s: CharSprite) {
@@ -556,7 +555,7 @@ export class LevelScene extends Phaser.Scene {
       : look.k * Math.max(0, 1 - (this.time.now - look.endedAt) / FADE_OUT);
     this.shade.setVisible(k > 0);
     this.vignette.setActive(k > 0);
-    this.speedFx.update(this.time.now, s, k, { bolts: tuning.speedLightning > 0, gap: tuning.ghostGap, streak: tuning.streak > 0, rings: tuning.speedGlow > 0 });
+    this.speedFx.update(this.time.now, s, k, { bolts: tuning.speedLightning > 0, gap: tuning.ghostGap, streak: tuning.streak > 0 });
     if (!k) return;
     const view = this.cameras.main.worldView, c = Phaser.Display.Color.Interpolate.ColorWithColor(Phaser.Display.Color.ValueToColor(0xffffff), Phaser.Display.Color.ValueToColor(SLOWMO.shade), 1, k);
     this.shade.setPosition(view.x - 8, view.y - 8).setSize(view.width + 16, view.height + 16).setFillStyle(Phaser.Display.Color.GetColor(c.r, c.g, c.b));
