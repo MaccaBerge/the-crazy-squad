@@ -62,7 +62,13 @@ Basic attacks have **no cooldown beyond their recovery**: you can always attack.
 
 ### Aim help
 
-Since aim is the facing direction in 8 steps, a dog standing at an odd angle can be awkward to hit. **Light aim help:** if a dog is within 30° of the facing direction and in range, the attack points straight at it. This is the usual fix for 8-direction aiming, and it can be switched off in the tuning panel.
+Since aim is the facing direction in 8 steps, a dog standing at an odd angle can be awkward to hit. Three things help (`src/combat/aim.ts`):
+
+1. **Hits count to the dog's body**, not its middle: reach and arc are measured to the edge of its 12 px feet box (`BODY_PAD`, 6 px).
+2. **Aim help:** when a swing starts, the best dog within `aimCone`° (35) of facing and up to `aimRange` px (10) past reach gets the attack pointed straight at it. Dogs straight ahead win over slightly closer ones off to the side. The rest of a combo stays on the same dog.
+3. **Step in:** if that dog is just out of reach, you step towards it during the windup, up to `aimPull` px (10), so you're in reach when the arc opens.
+
+All four are in the tuning panel (`aimHelp` 0 turns it off). Not done yet: a marker on the targeted dog, and turning the sprite to face it.
 
 ---
 
