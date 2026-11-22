@@ -98,7 +98,7 @@ export class SpeedFx {
       this.nextGhost = now + 45;
       this.lastGhost = { x: s.x, y: s.y };
       const ghost = this.scene.add.image(s.x, s.y, s.texture.key, s.frame.name).setOrigin(0.5, 1).setFlipX(s.flipX).setDepth(s.depth - 0.5)
-        .setTint(bolts ? SLOWMO.orange : SLOWMO.gold).setTintMode(Phaser.TintModes.FILL).setBlendMode(Phaser.BlendModes.ADD).setAlpha((bolts ? 0.2 : 0.5 * Math.min(1, gap / 5)) * k); // closer copies overlap more, so each is fainter
+        .setTint(bolts ? SLOWMO.orange : SLOWMO.gold).setTintMode(Phaser.TintModes.FILL).setBlendMode(Phaser.BlendModes.ADD).setAlpha((bolts ? 0.2 : 0.5 * Math.min(1, gap / 5)) * k * s.alpha); // closer copies overlap more, so each is fainter; they fade with his i-frame flicker too, or they pile into a white blob
       const ramp = [SLOWMO.gold, SLOWMO.orange, SLOWMO.red];
       this.scene.tweens.add({
         targets: ghost, alpha: 0, duration: bolts ? 200 : 380,
