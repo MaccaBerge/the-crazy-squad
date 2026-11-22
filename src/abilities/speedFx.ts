@@ -46,7 +46,7 @@ export class SpeedFx {
    * Per rendered frame. `k` is how strong slow-mo is right now (0 off, 1 full). `bolts` off: afterimages carry the look,
    * either as one merged `streak`, or as copies one every `gap` px (~10+ separate figures, ~2 blended).
    */
-  update(now: number, s: Sprite, k: number, { bolts = true, gap = 2, streak = false } = {}) {
+  update(now: number, s: Sprite, k: number, { bolts = true, gap = 2, streak = false, alpha = 0.5 } = {}) {
     this.drawStreak(now, s, k, !bolts && streak);
     const glow = this.glow.clear(), core = this.core.clear();
     if (k <= 0) {
@@ -98,7 +98,7 @@ export class SpeedFx {
       this.nextGhost = now + 45;
       this.lastGhost = { x: s.x, y: s.y };
       const ghost = this.scene.add.image(s.x, s.y, s.texture.key, s.frame.name).setOrigin(0.5, 1).setFlipX(s.flipX).setDepth(s.depth - 0.5)
-        .setTint(bolts ? SLOWMO.orange : SLOWMO.gold).setTintMode(Phaser.TintModes.FILL).setBlendMode(Phaser.BlendModes.ADD).setAlpha((bolts ? 0.2 : 0.5 * Math.min(1, gap / 5)) * k); // closer copies overlap more, so each is fainter
+        .setTint(bolts ? SLOWMO.orange : SLOWMO.gold).setTintMode(Phaser.TintModes.FILL).setBlendMode(Phaser.BlendModes.ADD).setAlpha((bolts ? 0.2 : alpha * Math.min(1, gap / 5)) * k); // closer copies overlap more, so each is fainter
       const ramp = [SLOWMO.gold, SLOWMO.orange, SLOWMO.red];
       this.scene.tweens.add({
         targets: ghost, alpha: 0, duration: bolts ? 200 : 380,

@@ -54,6 +54,7 @@ const { panel, sync } = tuningPanel(tuning, {
   speedLightning: [0, 1, 1],
   streak: [0, 1, 1],
   ghostGap: [1, 20, 1],
+  ghostAlpha: [0.05, 1, 0.05],
   fxShockwave: [0, 1, 1],
   waveRadius: [40, 320, 10],
   waveStrength: [0, 12, 1],
