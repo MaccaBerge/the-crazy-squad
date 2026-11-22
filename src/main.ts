@@ -52,6 +52,7 @@ const { panel, sync } = tuningPanel(tuning, {
   slowmo: [0.05, 1, 0.05],
   slowmoSpeed: [1, 3, 0.1],
   slowmoAttack: [1, 3, 0.1],
+  lunge: [0, 2, 0.1],
   speedLightning: [0, 1, 1],
   streak: [0, 1, 1],
   ghostGap: [1, 20, 1],
