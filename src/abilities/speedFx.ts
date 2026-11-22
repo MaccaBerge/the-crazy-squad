@@ -5,19 +5,17 @@ import { drawLightning, type Lightning, lightning, SLOWMO, streakColor } from '.
 
 const TRAIL_MS = 600; // how far back the lightning trail reaches
 const ARC_EVERY = 30; // ms between new arcs off the body
-const LIGHT = 'speed-light';
 type Sprite = Phaser.GameObjects.Sprite & { body: Phaser.Physics.Arcade.Body };
 type Arc = { l: Lightning; born: number; life: number };
 
 /**
  * Christian's slow-mo, on him: arcs of lightning crackling off his body and swept back as he runs, a trail of live
- * lightning strands along his path, glowing afterimages, and warm orange light round him that lights up the ground.
+ * lightning strands along his path, and glowing afterimages.
  * Everything is in the suit colours and drawn additively, so it reads as light, not paint.
  */
 export class SpeedFx {
   private glow: Phaser.GameObjects.Graphics;
   private core: Phaser.GameObjects.Graphics;
-  private light: Phaser.GameObjects.Image;
   private trail: (Vec & { t: number })[] = [];
   private arcs: Arc[] = []; // relative to his chest, so they ride along with him
   private nextArc = 0;
@@ -30,16 +28,6 @@ export class SpeedFx {
   constructor(private scene: Phaser.Scene) {
     this.glow = scene.add.graphics().setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.effects + 1);
     this.core = scene.add.graphics().setDepth(DEPTH.effects + 2);
-    if (!scene.textures.exists(LIGHT)) {
-      // A round light in a few hard steps instead of a smooth gradient: it scales up into chunky pixel rings.
-      const tex = scene.textures.createCanvas(LIGHT, 32, 32)!, ctx = tex.getContext();
-      for (const [r, a] of [[16, 0.12], [13, 0.22], [10, 0.35], [7, 0.55], [4, 0.8]]) {
-        ctx.fillStyle = `rgba(255,255,255,${a})`;
-        ctx.beginPath(), ctx.arc(16, 16, r, 0, Math.PI * 2), ctx.fill();
-      }
-      tex.refresh();
-    }
-    this.light = scene.add.image(0, 0, LIGHT).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.effects - 2.75).setScale(2.25).setTint(SLOWMO.orange).setVisible(false);
   }
 
   /**
@@ -50,16 +38,12 @@ export class SpeedFx {
     this.drawStreak(now, s, k, !bolts && streak);
     const glow = this.glow.clear(), core = this.core.clear();
     if (k <= 0) {
-      this.light.setVisible(false);
       this.trail = [];
       this.arcs = [];
       return;
     }
     const v = s.body.velocity, speed = v.length(), moving = speed > 10, chest = { x: s.x, y: s.y - 13 };
     const back = moving ? { x: -v.x / speed, y: -v.y / speed } : { x: 0, y: 0 };
-
-    // Warm light round him, flickering with the electricity.
-    this.light.setVisible(true).setPosition(chest.x, chest.y).setAlpha(k * (0.5 + 0.12 * Math.sin(now / 45) + Math.random() * 0.1));
 
     // Trail: live strands of lightning along where he just ran, re-jagged every frame so they writhe, fading behind.
     if (!bolts) (this.trail = []), (this.arcs = []);

@@ -8,7 +8,7 @@ import type { Vec } from '../movement';
 export const SLOWMO = {
   core: 0xf1e0c6, // the hottest middle of a bolt: the suit's pale highlight
   gold: 0xf0bc66, // the suit's gold trim: inner glow, the HUD icon
-  orange: 0xe3723c, // outer glow, the light round him, the glowing screen edges
+  orange: 0xe3723c, // outer glow, the glowing screen edges
   red: 0xb6201f, // the widest, faintest glow: the suit's red
   zoom: 1.12, // camera zoom in while it lasts
   shade: 0x5a4a55, // the world is multiplied by this (dark, a little cool) under the lightning, so his light and the lightning blaze

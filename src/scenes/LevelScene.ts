@@ -494,7 +494,7 @@ export class LevelScene extends Phaser.Scene {
     const s = this.active;
     this.worldT += (delta / 1000) * this.slow;
     const worldDt = Math.min(delta / 1000, 0.05) * this.slow;
-    // y-sort by feet. In slow-mo he's lifted over the darkening and his own light (SpeedFx), so he stays in full colour;
+    // y-sort by feet. In slow-mo he's lifted over the darkening, so he stays in full colour;
     // the dogs are lifted the same way (DogAI.update) and sorted with him, so a dog in front of him draws in front.
     // shortcut: that also draws them over tree tops and roofs while it lasts; sort them under Above if it shows.
     s.setDepth(this.slowmo ? DEPTH.effects - 2.5 + s.y * 1e-5 : DEPTH.actors + s.y);
@@ -545,7 +545,7 @@ export class LevelScene extends Phaser.Scene {
 
   /**
    * Slow-mo on screen: the world darkens to a warm dusk under the lightning so it blazes, the screen edges glow orange, and
-   * SpeedFx puts the lightning, trail and light on Christian. All of it follows how far the world has slowed.
+   * SpeedFx puts the lightning, trail and afterimages on Christian. All of it follows how far the world has slowed.
    * The bolts at the screen edges are the HUD's.
    */
   private drawSlowmo(s: CharSprite) {
