@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { aimPull, pickTarget, toward } from './aim';
+import { aimPull, inCone, pickTarget, toward } from './aim';
 import { inArc, type Swing } from './swing';
 
 const o = { x: 0, y: 0 }, right = { x: 1, y: 0 }, help = { cone: 35, range: 30 };
@@ -29,4 +29,11 @@ test("hits count to the dog's body, not only its middle", () => {
   expect(inArc(punch, o, right, { x: 18, y: 0 }, 6)).toBe(true); // …but its near side isn't
   expect(inArc(punch, o, right, { x: 10, y: 12 }, 6)).toBe(true); // 50° off: the arc reaches its near shoulder
   expect(inArc(punch, o, right, { x: -10, y: 0 }, 6)).toBe(false); // behind
+});
+
+test('inCone: in range and inside the cone only', () => {
+  const help = { cone: 35, range: 30 };
+  expect(inCone({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 20, y: 5 }, help)).toBe(true);
+  expect(inCone({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: -18, y: 0 }, help)).toBe(false); // behind: a combo won't spin round to it
+  expect(inCone({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 31, y: 0 }, help)).toBe(false);
 });

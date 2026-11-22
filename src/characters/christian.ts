@@ -13,7 +13,7 @@ export const christian: CharacterDef = {
     // Short freezes keep the punches snappy; the kick's long one, lunge and shake make the finisher land.
     { damage: 10, windup: 0.05, active: 0.06, recovery: 0.12, radius: 14, arc: 90, knockback: 0, hitstop: 30, lunge: 3, streak: true, anim: 'jab' },
     { damage: 10, windup: 0.05, active: 0.06, recovery: 0.12, radius: 14, arc: 90, knockback: 0, hitstop: 30, lunge: 3, streak: true, anim: 'cross' },
-    { damage: 18, windup: 0.05, active: 0.06, recovery: 0.3, radius: 14, arc: 90, knockback: 120, hitstop: 80, lunge: 6, shake: true, anim: 'kick' },
+    { damage: 18, windup: 0.05, active: 0.06, recovery: 0.3, radius: 14, arc: 90, knockback: 160, hitstop: 80, lunge: 6, shake: true, anim: 'kick' },
   ],
   // Slow-mo: he runs so fast the world slows down around him. The slowdown itself is tuning.slowmo (T panel).
   ability1: { id: 'slowmo', cooldown: 15, duration: 10, freeSprint: true },

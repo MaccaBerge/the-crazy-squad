@@ -53,7 +53,7 @@ The reference is **one basic hit ≈ 20 damage** against a normal dog with **70 
 |---|---|---|---|---|---|---|---|
 | Wrench swing | 30 | 0.15 s | 0.10 s | 0.35 s | Arc of 120°, 20 px | Heavy (staggers tanks) | Hits every dog in the arc |
 | Bandy shot | 15 | 0.10 s | — | 0.30 s | Ball, 220 px/s, about 160 px reach | Light | One ball out at a time to start; stops at walls |
-| Punch, punch, kick | 10 / 10 / 18 | 0.05 s | 0.06 s | 0.12 s (0.3 s after the kick) | Small box, 14 px | None / none / medium | Press again within 0.3 s to continue the combo |
+| Punch, punch, kick | 10 / 10 / 18 | 0.05 s | 0.06 s | 0.12 s (0.3 s after the kick) | Small box, 14 px | None / none / medium (160) | Press again within 0.3 s to continue the combo |
 | Phone zap | 8 | 0.10 s | 0.12 s | 0.40 s | Line, 48 px | None | `stunned` for 0.6 s; the same dog can't be stunned again for 2 s |
 
 Basic attacks have **no cooldown beyond their recovery**: you can always attack. Abilities have real cooldowns, and those keep recharging while a character is off stage.
@@ -109,7 +109,7 @@ No floating damage numbers. The health bars and the hit feel are enough at this 
 ## 6. Dogs in a fight
 
 - **HP:** normal dogs 70, tanks (Bruiser) 160. Each breed sets its own in its definition.
-- **Being hit:** a dog's own invulnerability after a hit is short (0.1 s), so Christian's combo connects. A dog **staggers** (its windup is cancelled) when a hit's knockback is stronger than its **poise**: light dogs stagger from anything, the Bruiser only from heavy hits. Marcus's stun always works.
+- **Being hit:** a dog's own invulnerability after a hit is short (0.1 s), so Christian's combo connects. A dog **staggers** (its windup is cancelled) when a hit's knockback is at least its **poise**: light dogs stagger from any hit that pushes, the Bruiser only from heavy hits. Hits with no knockback (Christian's punches) never stagger. After a stagger ends, the same dog can't be staggered again for 1 s (`STAGGER_GUARD`), so mashing can't keep a dog locked out of the fight. Marcus's stun always works.
 - **Knocked out at 0 HP:** a yelp, a spin with stars over its head for 0.6 s, then it runs off screen (or poofs if it's stuck). It stops counting as an enemy immediately: no hitbox, no token. *shortcut: until the KO animation exists, a code poof is fine.*
 - **Ranged dogs** (Heavy Gunner, Long Shot, Mad Bomber): their bullets and bombs are dodged with the dodge, blocked by walls and some props, and slowed by Christian's time-slow. The Long Shot's red laser is the telegraph.
 - **Shield dog** (K-9 Cop): blocks hits from the front. Get round him, knock him back with Kristian, or stun him with Marcus.

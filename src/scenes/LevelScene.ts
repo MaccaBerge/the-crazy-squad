@@ -26,10 +26,11 @@ import { DOG_KINDS, Dogs, isDogKind, preloadDogs } from '../dogs/dogs';
 import { BREEDS } from '../dogs/breeds';
 import { DogAI } from '../dogs/dogAI';
 import type { Vec } from '../movement';
-import { aimPull, BODY_PAD, pickTarget, toward } from '../combat/aim';
+import { aimPull, BODY_PAD, inCone, pickTarget, toward } from '../combat/aim';
 import { comboStep, inArc, type Swing, swingPhase } from '../combat/swing';
 import { ringSlots, separation } from '../ai/separation';
 import { HUNTING } from '../ai/dogBrain';
+import { lineOfSight } from '../ai/path';
 import { SLOWMO } from '../abilities/slowmo';
 import { SpeedFx } from '../abilities/speedFx';
 import { registerFilters } from '../fx/filters';
@@ -107,7 +108,7 @@ export class LevelScene extends Phaser.Scene {
   private sight?: SolidAt;
   private spawned = 0;
   private hurt = 0;
-  private swing?: { def: Swing; step: number; t: number; hit: Set<DogAI>; pull: number }; // pull: px aim help steps you in during the windup
+  private swing?: { def: Swing; step: number; t: number; hit: Set<DogAI>; pull: number; pulled: number }; // pull: px aim help steps you in during the windup
   private aimed?: DogAI; // the dog the combo is on, so its next steps stay on it
   private combo = { step: -1, since: 0 }; // the last combo step swung, and s since it ended
   private sparks: { x: number; y: number; at: number; big: boolean }[] = []; // hit sparks, drawn for SPARK ms
@@ -272,7 +273,7 @@ export class LevelScene extends Phaser.Scene {
     const intent = this.controller.getIntent(performance.now());
     // Only drain while actually moving: holding Shift against a wall shouldn't tire you out.
     const moving = !!(intent.move.x || intent.move.y) && this.active.body.velocity.length() > 5;
-    this.sprinting = this.party.tick(dt, intent.sprint && moving);
+    this.sprinting = this.party.tick(dt, intent.sprint && moving && !this.swing); // attacking you only creep: no sprint drain
     const swap = SWAP_ACTIONS.find((a) => intent.pressed.has(a));
     if (swap) this.trySwap(swap);
     const ability = this.party.abilities[this.party.activeIndex];
@@ -324,8 +325,12 @@ export class LevelScene extends Phaser.Scene {
     const sw = this.swing;
     const phase = sw && swingPhase(sw.def, sw.t);
     // Aim help's pull happens in the windup, so you're in reach when the arc opens; the swing's own lunge in its active part.
-    if (sw?.pull && phase === 'windup' && sw.def.windup > 0)
-      b.setVelocity((this.facing.x * sw.pull) / sw.def.windup, (this.facing.y * sw.pull) / sw.def.windup);
+    // By distance, not time: the swing's clock is a frame ahead of the first move, so a time-spread pull fell short.
+    if (sw && sw.pulled < sw.pull && phase === 'windup') {
+      const v = (sw.pull - sw.pulled) / Math.max(dt, sw.def.windup - sw.t);
+      sw.pulled += v * dt;
+      b.setVelocity(this.facing.x * v, this.facing.y * v);
+    }
     if (sw?.def.lunge && phase === 'active')
       b.setVelocity((this.facing.x * sw.def.lunge) / sw.def.active, (this.facing.y * sw.def.lunge) / sw.def.active);
 
@@ -357,7 +362,7 @@ export class LevelScene extends Phaser.Scene {
     if (phase !== 'active') return;
     const s = this.active, f = this.facing;
     for (const d of this.brains) {
-      if (d.out || sw.hit.has(d) || !inArc(sw.def, s, f, d.sprite, BODY_PAD)) continue;
+      if (d.out || sw.hit.has(d) || !inArc(sw.def, s, f, d.sprite, BODY_PAD) || !this.seen(d)) continue;
       sw.hit.add(d);
       if (!d.takeHit(sw.def.damage, { x: f.x * sw.def.knockback, y: f.y * sw.def.knockback })) continue;
       this.freeze(sw.def.hitstop ?? (sw.def.heavy ? tuning.heavyHitstop : tuning.hitstop));
@@ -371,17 +376,25 @@ export class LevelScene extends Phaser.Scene {
    * to the dog it's on), and you step in to close a short gap during the windup, so you snap onto the dog instead of missing it.
    */
   private aim(def: Swing, step: number) {
-    const swing = { def, step, t: 0, hit: new Set<DogAI>(), pull: 0 };
+    const swing = { def, step, t: 0, hit: new Set<DogAI>(), pull: 0, pulled: 0 };
     if (!(tuning.aimHelp > 0)) return swing;
-    const s = this.active, reach = def.radius + BODY_PAD, range = reach + tuning.aimRange;
+    // Only dogs you could step in and reach (pull keeps 2 px to land inside), that you can see (not through walls).
+    const s = this.active, reach = def.radius + BODY_PAD, help = { cone: tuning.aimCone, range: reach + Math.min(tuning.aimRange, tuning.aimPull - 2) };
     const far = (d: DogAI) => Phaser.Math.Distance.BetweenPoints(s, d.sprite);
-    const live = this.brains.filter((d) => !d.out);
-    const kept = step > 0 && this.aimed && !this.aimed.out && far(this.aimed) <= range ? this.aimed : undefined;
-    const target = kept ?? live[pickTarget(s, this.facing, live.map((d) => d.sprite), { cone: tuning.aimCone, range })];
+    const live = this.brains.filter((d) => !d.out && this.seen(d));
+    // Mid-combo it keeps to its dog, but only while that dog is still in front: never spins you round onto one behind.
+    const kept = step > 0 && this.aimed && live.includes(this.aimed) && inCone(s, this.facing, this.aimed.sprite, help) ? this.aimed : undefined;
+    const target = kept ?? live[pickTarget(s, this.facing, live.map((d) => d.sprite), help)];
     this.aimed = target;
     if (!target) return swing;
     this.facing = toward(s, target.sprite, this.facing);
+    this.dir = snapDir(this.dir, this.facing); // the body turns with the attack
     return { ...swing, pull: aimPull(far(target) - reach + 2, tuning.aimPull) }; // +2: land just inside
+  }
+
+  /** Whether nothing solid is between the active character and this dog: attacks and aim help don't go through walls. */
+  private seen(d: DogAI) {
+    return !this.sight || lineOfSight(this.sight, this.active, d.sprite);
   }
 
   /**
@@ -399,8 +412,8 @@ export class LevelScene extends Phaser.Scene {
     this.slowmo = true;
     this.freeze(80);
     const cam = this.cameras.main;
+    if (!this.tweens.isTweening(cam)) this.baseZoom = cam.zoom; // mid zoom-out, keep the old base so the zoom can't creep
     this.tweens.killTweensOf(cam);
-    this.baseZoom = cam.zoom;
     this.tweens.add({ targets: cam, zoom: this.baseZoom * SLOWMO.zoom, duration: 250, ease: 'Cubic.Out' });
     this.shockwave(this.active, 1);
   }
@@ -605,6 +618,8 @@ export class LevelScene extends Phaser.Scene {
     if (this.shimmer.active) {
       [this.shimmer.x, this.shimmer.y] = screen(s.x - (v.x / speed) * 14, s.y - 12 - (v.y / speed) * 14); // just behind him
       Object.assign(this.shimmer, { radius: 18 * cam.zoom, strength: tuning.shimmerStrength * Math.min(1, speed / 150), time: now / 1000 });
+      const r = s.getBounds(), [x0, y0] = screen(r.x - 1, r.y - 1), [x1, y1] = screen(r.right + 1, r.bottom + 1);
+      this.shimmer.keep = [x0, y0, x1, y1]; // his sprite box: the haze goes round him, he doesn't wobble
     }
   }
 

@@ -10,18 +10,21 @@ export type AimHelp = { cone: number; range: number }; // degrees either side of
  * The dog an attack should go for: inside `cone`° either side of `facing` and within `range`, the best one by distance
  * and angle (a dog dead ahead beats a slightly closer one off to the side). Returns its index, or -1.
  */
-export function pickTarget(from: Vec, facing: Vec, dogs: Vec[], { cone, range }: AimHelp) {
-  const cos = Math.cos((cone * Math.PI) / 180);
+export function pickTarget(from: Vec, facing: Vec, dogs: Vec[], help: AimHelp) {
   let best = -1, bestScore = Infinity;
   dogs.forEach((p, i) => {
-    const dx = p.x - from.x, dy = p.y - from.y, d = Math.hypot(dx, dy);
-    if (d > range) return;
-    const along = d < 1e-6 ? 1 : (dx * facing.x + dy * facing.y) / d;
-    if (along < cos) return;
+    if (!inCone(from, facing, p, help)) return;
+    const d = Math.hypot(p.x - from.x, p.y - from.y), along = d < 1e-6 ? 1 : ((p.x - from.x) * facing.x + (p.y - from.y) * facing.y) / d;
     const score = d * (2 - along); // straight ahead counts as its distance; at the cone's edge, a bit further
     if (score < bestScore) (best = i), (bestScore = score);
   });
   return best;
+}
+
+/** Whether `to` is within `range` of `from` and `cone`° either side of `facing`. */
+export function inCone(from: Vec, facing: Vec, to: Vec, { cone, range }: AimHelp) {
+  const dx = to.x - from.x, dy = to.y - from.y, d = Math.hypot(dx, dy);
+  return d <= range && (d < 1e-6 || (dx * facing.x + dy * facing.y) / d >= Math.cos((cone * Math.PI) / 180));
 }
 
 /** The unit vector from `from` to `to`, or `fallback` if they're on top of each other. */
