@@ -63,7 +63,6 @@ export const tuning = {
   lunge: 0, // share of each swing's own step forward (Christian's 3/3/6 px); 0 = punches and kicks stay put
   slowmoSpeed: 1.6, // and his own speed and acceleration then, so he looks even faster next to the slowed world
   speedLightning: 0, // 1: lightning off his body and along his trail during slow-mo; 0: afterimages only (testing)
-  streak: 0, // 1: the afterimage is one merged shape with a colour and fade gradient; 0: separate copies, ghostGap apart
   fxShockwave: 1, waveRadius: 160, waveStrength: 4, waveMs: 450, // shader ring when slow-mo starts and ends (shader blueprint §6)
   fxShimmer: 1, shimmerStrength: 1, // heat haze behind Christian while he runs in slow-mo
   boltGrow: 240, boltLinger: 160, boltEvery: 70, // edge lightning: ms to grow (big ones 1.5×), ms it lingers after (to 2×), ms between new ones (to ~2×)
@@ -610,7 +609,7 @@ export class LevelScene extends Phaser.Scene {
       : look.k * Math.max(0, 1 - (this.time.now - look.endedAt) / FADE_OUT);
     this.shade.setVisible(k > 0);
     this.vignette.setActive(k > 0);
-    this.speedFx.update(this.time.now, s, k, { bolts: tuning.speedLightning > 0, gap: tuning.ghostGap, streak: tuning.streak > 0 });
+    this.speedFx.update(this.time.now, s, k, { bolts: tuning.speedLightning > 0, gap: tuning.ghostGap });
     if (!k) return;
     const view = this.cameras.main.worldView, c = Phaser.Display.Color.Interpolate.ColorWithColor(Phaser.Display.Color.ValueToColor(0xffffff), Phaser.Display.Color.ValueToColor(SLOWMO.shade), 1, k);
     this.shade.setPosition(view.x - 8, view.y - 8).setSize(view.width + 16, view.height + 16).setFillStyle(Phaser.Display.Color.GetColor(c.r, c.g, c.b));

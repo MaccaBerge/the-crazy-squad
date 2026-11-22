@@ -82,11 +82,3 @@ export function drawLightning(glow: G, core: G, bolt: Lightning, alpha: number, 
   core.lineStyle(thick, SLOWMO.core, alpha).strokePoints(main);
   for (const f of forks) core.lineStyle(1, SLOWMO.gold, 0.85 * alpha).strokePoints(f);
 }
-
-/** The streak's colour at `age` (0 newest, 1 oldest): gold → orange → red, darkening to black (see-through when added). */
-export function streakColor(age: number) {
-  const stops = [SLOWMO.gold, SLOWMO.orange, SLOWMO.red], x = Math.min(age, 1) * 2, i = Math.min(1, Math.floor(x)), f = x - i;
-  const ch = (c: number, sh: number) => (c >> sh) & 255, fade = 1 - Math.min(age, 1);
-  const mix = (sh: number) => Math.round((ch(stops[i], sh) * (1 - f) + ch(stops[i + 1], sh) * f) * fade) << sh;
-  return mix(16) | mix(8) | mix(0);
-}
