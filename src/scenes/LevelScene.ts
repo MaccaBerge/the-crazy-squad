@@ -618,6 +618,8 @@ export class LevelScene extends Phaser.Scene {
     if (this.shimmer.active) {
       [this.shimmer.x, this.shimmer.y] = screen(s.x - (v.x / speed) * 14, s.y - 12 - (v.y / speed) * 14); // just behind him
       Object.assign(this.shimmer, { radius: 18 * cam.zoom, strength: tuning.shimmerStrength * Math.min(1, speed / 150), time: now / 1000 });
+      const r = s.getBounds(), [x0, y0] = screen(r.x - 1, r.y - 1), [x1, y1] = screen(r.right + 1, r.bottom + 1);
+      this.shimmer.keep = [x0, y0, x1, y1]; // his sprite box: the haze goes round him, he doesn't wobble
     }
   }
 
