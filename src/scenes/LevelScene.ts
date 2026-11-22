@@ -60,6 +60,7 @@ export const tuning = {
   packRing: 18, // px from you to each hunting dog's spot in the ring (inside their reach, so they can still bite)
   slowmo: 0.3, // world speed during Christian's slow-mo (everything but him)
   slowmoAttack: 1.6, // and his attacks play this much faster then: a flurry, same damage per hit
+  lunge: 0, // share of each swing's own step forward (Christian's 3/3/6 px); 0 = punches and kicks stay put
   slowmoSpeed: 1.6, // and his own speed and acceleration then, so he looks even faster next to the slowed world
   speedLightning: 0, // 1: lightning off his body and along his trail during slow-mo; 0: afterimages only (testing)
   streak: 0, // 1: the afterimage is one merged shape with a colour and fade gradient; 0: separate copies, ghostGap apart
@@ -338,8 +339,8 @@ export class LevelScene extends Phaser.Scene {
       sw.pulled += v * dt;
       b.setVelocity(this.facing.x * v, this.facing.y * v);
     }
-    if (sw?.def.lunge && phase === 'active')
-      b.setVelocity((this.facing.x * sw.def.lunge * this.swingRate()) / sw.def.active, (this.facing.y * sw.def.lunge * this.swingRate()) / sw.def.active);
+    const lunge = (sw?.def.lunge ?? 0) * tuning.lunge * this.swingRate();
+    if (sw && lunge > 0 && phase === 'active') b.setVelocity((this.facing.x * lunge) / sw.def.active, (this.facing.y * lunge) / sw.def.active);
 
     if (this.swing) return; // facing is locked from windup to the end of recovery, so a swing can't turn mid-arc
     if (intent.move.x || intent.move.y) {
