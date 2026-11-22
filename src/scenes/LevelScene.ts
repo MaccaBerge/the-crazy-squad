@@ -30,7 +30,7 @@ import { aimPull, BODY_PAD, inCone, pickTarget, toward } from '../combat/aim';
 import { comboStep, inArc, type Swing, swingPhase } from '../combat/swing';
 import { ringSlots, separation } from '../ai/separation';
 import { HUNTING } from '../ai/dogBrain';
-import { lineOfSight } from '../ai/path';
+import { crossesRect, lineOfSight } from '../ai/path';
 import { SLOWMO } from '../abilities/slowmo';
 import { SpeedFx } from '../abilities/speedFx';
 import { registerFilters } from '../fx/filters';
@@ -107,6 +107,7 @@ export class LevelScene extends Phaser.Scene {
   private pack: Phaser.GameObjects.GameObject[] = []; // thinking dogs' sprites; colliders read this array live, so spawned dogs just join it
   private nav?: SolidAt;
   private sight?: SolidAt;
+  private wallSight?: SolidAt; // walls only: the player's sight tests trunks by their real shape, not whole tiles
   private spawned = 0;
   private hurt = 0;
   private swing?: { def: Swing; step: number; t: number; hit: Set<DogAI>; pull: number; pulled: number }; // pull: px aim help steps you in during the windup
@@ -115,6 +116,7 @@ export class LevelScene extends Phaser.Scene {
   private sparks: { x: number; y: number; at: number; big: boolean }[] = []; // hit sparks, drawn for SPARK ms
   private swingFx!: Phaser.GameObjects.Graphics;
   private frozenUntil = 0;
+  private frozenAt = 0; // when the current freeze began
   private knock: Vec = { x: 0, y: 0 };
   private readout?: HTMLDivElement;
   private slowmo = false; // Christian's slow-mo is running
@@ -211,6 +213,7 @@ export class LevelScene extends Phaser.Scene {
       return !!tile && (own ?? (name === 'Walls' && tile.collides));
     });
     this.sight = this.navGrid(map.width, map.height, this.trees.sightBlocks, tileBlocksSight);
+    this.wallSight = this.navGrid(map.width, map.height, [], tileBlocksSight);
     const nav = (this.nav = this.navGrid(map.width, map.height, [...this.trees.bodies, ...this.dogs.sprites.map((d) => d.body as Phaser.Physics.Arcade.Body)]));
     for (const d of this.brains) Object.assign(d, { nav, sight: this.sight });
     this.leaves = new FallingLeaves(this, this.trees.sources);
@@ -318,6 +321,9 @@ export class LevelScene extends Phaser.Scene {
     // Exhausted (bar just ran dry): walk slower. Animation speed still compares to the normal walk, so the legs look heavy.
     p.maxSpeed *= this.party.stamina[this.party.activeIndex].speedFactor;
     const v = stepVelocity(s.body.velocity, intent.move, dt, p);
+    // Swinging, nothing carries over from the aim pull or the lunge: you creep at most (else a lunge slid on into recovery).
+    const fast = Math.hypot(v.x, v.y);
+    if (this.swing && fast > p.maxSpeed) (v.x *= p.maxSpeed / fast), (v.y *= p.maxSpeed / fast);
     const b = s.body;
     const nudge = cornerNudge({ x: b.x, y: b.y, w: b.width, h: b.height }, intent.move, b.blocked, this.solid);
     if (nudge?.x) v.x = nudge.x * p.maxSpeed * NUDGE_SPEED;
@@ -366,7 +372,7 @@ export class LevelScene extends Phaser.Scene {
       if (d.out || sw.hit.has(d) || !inArc(sw.def, s, f, d.sprite, BODY_PAD) || !this.seen(d)) continue;
       sw.hit.add(d);
       if (!d.takeHit(sw.def.damage, { x: f.x * sw.def.knockback, y: f.y * sw.def.knockback })) continue;
-      this.freeze(sw.def.hitstop ?? (sw.def.heavy ? tuning.heavyHitstop : tuning.hitstop));
+      this.freeze((sw.def.hitstop ?? (sw.def.heavy ? tuning.heavyHitstop : tuning.hitstop)) / this.swingRate()); // faster swings, shorter stops: the flurry blurs instead of stuttering
       this.sparks.push({ x: d.sprite.x - f.x * 5, y: d.sprite.y - 10 - f.y * 3, at: this.time.now, big: !!sw.def.shake });
       if (sw.def.shake) this.cameras.main.shake(90, 0.006);
     }
@@ -400,7 +406,8 @@ export class LevelScene extends Phaser.Scene {
 
   /** Whether nothing solid is between the active character and this dog: attacks and aim help don't go through walls. */
   private seen(d: DogAI) {
-    return !this.sight || lineOfSight(this.sight, this.active, d.sprite);
+    const a = this.active, b = d.sprite;
+    return !this.wallSight || (lineOfSight(this.wallSight, a, b) && !this.trees.sightBlocks.some((r) => crossesRect(a, b, r)));
   }
 
   /**
@@ -409,6 +416,7 @@ export class LevelScene extends Phaser.Scene {
    */
   private freeze(ms: number) {
     const world = this.physics.world;
+    if (!world.isPaused) this.frozenAt = this.time.now;
     this.frozenUntil = Math.max(this.frozenUntil, this.time.now + ms);
     world.pause(); // update() resumes it
   }
@@ -534,6 +542,8 @@ export class LevelScene extends Phaser.Scene {
     if (this.frozenUntil && this.time.now >= this.frozenUntil) {
       this.frozenUntil = 0;
       this.physics.world.resume();
+      // Abilities run on real time: frozen hits would otherwise stretch slow-mo, so mashing made it last longer.
+      for (const a of this.party.abilities) a?.tick((this.time.now - this.frozenAt) / 1000);
     }
     const s = this.active;
     this.worldT += (delta / 1000) * this.slow;

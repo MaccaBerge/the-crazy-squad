@@ -96,7 +96,7 @@ When a hit lands, on the squad or on a dog:
 
 | Feedback | Value |
 |---|---|
-| **Hit freeze** (hitstop) | The attacker and target freeze for 50 ms (80 ms for heavy hits). The rest of the world keeps going. |
+| **Hit freeze** (hitstop) | The attacker and target freeze for 50 ms (80 ms for heavy hits). The rest of the world keeps going. Swings sped up by slow-mo freeze for that much less (÷ `slowmoAttack`), and abilities keep counting through a freeze, so hits never stretch them. |
 | **Flash** | The target turns white for 1 frame, then blinks during its invulnerability (the squad's flicker already exists) |
 | **Knockback** | Pushed away from the attacker. Light 60 px/s, medium 120, heavy 200, reduced by the target's weight. |
 | **Screen shake** | Only for heavy hits and for hits on the squad. Small, with an option to turn it off. |

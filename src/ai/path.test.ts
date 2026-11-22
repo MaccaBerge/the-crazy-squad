@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import type { SolidAt } from '../collision/cornerAssist';
-import { clearLine, findPath, lineOfSight } from './path';
+import { clearLine, crossesRect, findPath, lineOfSight } from './path';
 
 // A 7×5 room with a wall down the middle and a gap at the bottom:
 const MAP = [
@@ -43,4 +43,14 @@ test('sight is blocked by a solid tile between, not by open ground', () => {
   const wall: SolidAt = (x, y) => x === 2 && y === 0; // one wall tile at x 32–48, y 0–16
   expect(lineOfSight(wall, { x: 8, y: 8 }, { x: 72, y: 8 })).toBe(false);
   expect(lineOfSight(wall, { x: 8, y: 24 }, { x: 72, y: 24 })).toBe(true);
+});
+
+test('crossesRect: only a line through the trunk itself is blocked', () => {
+  const trunk = { x: 352, y: 112, width: 8, height: 4 }; // the 8x4 trunk the tester found blocking a whole tile
+  expect(crossesRect({ x: 345, y: 110 }, { x: 357, y: 110 }, trunk)).toBe(false); // just north of it
+  expect(crossesRect({ x: 345, y: 114 }, { x: 367, y: 114 }, trunk)).toBe(true); // straight through
+  expect(crossesRect({ x: 356, y: 100 }, { x: 356, y: 130 }, trunk)).toBe(true); // vertical, through
+  expect(crossesRect({ x: 350, y: 100 }, { x: 350, y: 130 }, trunk)).toBe(false); // vertical, beside
+  expect(crossesRect({ x: 340, y: 100 }, { x: 351, y: 111 }, trunk)).toBe(false); // stops short
+  expect(crossesRect({ x: 350, y: 110 }, { x: 362, y: 118 }, { x: 355, y: 113, width: 2, height: 2 })).toBe(true); // thin, diagonal
 });
