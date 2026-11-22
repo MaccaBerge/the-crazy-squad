@@ -71,3 +71,19 @@ export function lineOfSight(solid: SolidAt, a: Vec, b: Vec): boolean {
   }
   return true;
 }
+
+/** Whether the segment a→b passes through the rectangle (slab clipping, so even a 2 px trunk can't slip between samples). */
+export function crossesRect(a: Vec, b: Vec, r: { x: number; y: number; width: number; height: number }): boolean {
+  let t0 = 0, t1 = 1;
+  for (const [d, lo, hi, p] of [[b.x - a.x, r.x, r.x + r.width, a.x], [b.y - a.y, r.y, r.y + r.height, a.y]]) {
+    if (d === 0) {
+      if (p <= lo || p >= hi) return false;
+      continue;
+    }
+    let u = (lo - p) / d, v = (hi - p) / d;
+    if (u > v) [u, v] = [v, u];
+    t0 = Math.max(t0, u), t1 = Math.min(t1, v);
+    if (t0 >= t1) return false;
+  }
+  return true;
+}
