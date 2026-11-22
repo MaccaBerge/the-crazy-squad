@@ -26,6 +26,7 @@ import { DOG_KINDS, Dogs, isDogKind, preloadDogs } from '../dogs/dogs';
 import { BREEDS } from '../dogs/breeds';
 import { DogAI } from '../dogs/dogAI';
 import type { Vec } from '../movement';
+import { aimPull, BODY_PAD, pickTarget, toward } from '../combat/aim';
 import { comboStep, inArc, type Swing, swingPhase } from '../combat/swing';
 import { ringSlots, separation } from '../ai/separation';
 import { HUNTING } from '../ai/dogBrain';
@@ -63,6 +64,7 @@ export const tuning = {
   fxShockwave: 1, waveRadius: 160, waveStrength: 4, waveMs: 450, // shader ring when slow-mo starts and ends (shader blueprint §6)
   fxShimmer: 1, shimmerStrength: 1, // heat haze behind Christian while he runs in slow-mo
   boltGrow: 240, boltLinger: 160, boltEvery: 70, // edge lightning: ms to grow (big ones 1.5×), ms it lingers after (to 2×), ms between new ones (to ~2×)
+  aimHelp: 1, aimCone: 35, aimRange: 10, aimPull: 10, // attacks snap to a dog within aimCone° of facing and aimRange px past reach, lunging up to aimPull px to it
   ghostGap: 2, // px between afterimages: 2 blends them into one smooth streak, 10 or 14 shows separate figures
   ...WEATHER[DEFAULT_WEATHER], // replaced by the map's weather on load
 };
@@ -105,7 +107,8 @@ export class LevelScene extends Phaser.Scene {
   private sight?: SolidAt;
   private spawned = 0;
   private hurt = 0;
-  private swing?: { def: Swing; step: number; t: number; hit: Set<DogAI> };
+  private swing?: { def: Swing; step: number; t: number; hit: Set<DogAI>; pull: number }; // pull: px aim help steps you in during the windup
+  private aimed?: DogAI; // the dog the combo is on, so its next steps stay on it
   private combo = { step: -1, since: 0 }; // the last combo step swung, and s since it ended
   private sparks: { x: number; y: number; at: number; big: boolean }[] = []; // hit sparks, drawn for SPARK ms
   private swingFx!: Phaser.GameObjects.Graphics;
@@ -319,7 +322,11 @@ export class LevelScene extends Phaser.Scene {
     if (nudge?.y) v.y = nudge.y * p.maxSpeed * NUDGE_SPEED;
     b.setVelocity(v.x, v.y);
     const sw = this.swing;
-    if (sw?.def.lunge && swingPhase(sw.def, sw.t) === 'active')
+    const phase = sw && swingPhase(sw.def, sw.t);
+    // Aim help's pull happens in the windup, so you're in reach when the arc opens; the swing's own lunge in its active part.
+    if (sw?.pull && phase === 'windup' && sw.def.windup > 0)
+      b.setVelocity((this.facing.x * sw.pull) / sw.def.windup, (this.facing.y * sw.pull) / sw.def.windup);
+    if (sw?.def.lunge && phase === 'active')
       b.setVelocity((this.facing.x * sw.def.lunge) / sw.def.active, (this.facing.y * sw.def.lunge) / sw.def.active);
 
     if (this.swing) return; // facing is locked from windup to the end of recovery, so a swing can't turn mid-arc
@@ -337,7 +344,7 @@ export class LevelScene extends Phaser.Scene {
     if (pressed && !this.swing && this.hurt <= 0) {
       this.controller.consume('attack'); // while swinging the press stays buffered, so mashing chains swings
       const step = steps && comboStep(steps.length, this.combo.step, this.combo.since);
-      if (steps && step !== undefined) this.swing = { def: steps[step], step, t: 0, hit: new Set() };
+      if (steps && step !== undefined) this.swing = this.aim(steps[step], step);
     }
     const sw = this.swing;
     if (!sw) return;
@@ -350,13 +357,31 @@ export class LevelScene extends Phaser.Scene {
     if (phase !== 'active') return;
     const s = this.active, f = this.facing;
     for (const d of this.brains) {
-      if (d.out || sw.hit.has(d) || !inArc(sw.def, s, f, d.sprite)) continue;
+      if (d.out || sw.hit.has(d) || !inArc(sw.def, s, f, d.sprite, BODY_PAD)) continue;
       sw.hit.add(d);
       if (!d.takeHit(sw.def.damage, { x: f.x * sw.def.knockback, y: f.y * sw.def.knockback })) continue;
       this.freeze(sw.def.hitstop ?? (sw.def.heavy ? tuning.heavyHitstop : tuning.hitstop));
       this.sparks.push({ x: d.sprite.x - f.x * 5, y: d.sprite.y - 10 - f.y * 3, at: this.time.now, big: !!sw.def.shake });
       if (sw.def.shake) this.cameras.main.shake(90, 0.006);
     }
+  }
+
+  /**
+   * Aim help (combat blueprint §3): a new swing points straight at the best dog roughly in front (or, mid-combo, keeps
+   * to the dog it's on), and you step in to close a short gap during the windup, so you snap onto the dog instead of missing it.
+   */
+  private aim(def: Swing, step: number) {
+    const swing = { def, step, t: 0, hit: new Set<DogAI>(), pull: 0 };
+    if (!(tuning.aimHelp > 0)) return swing;
+    const s = this.active, reach = def.radius + BODY_PAD, range = reach + tuning.aimRange;
+    const far = (d: DogAI) => Phaser.Math.Distance.BetweenPoints(s, d.sprite);
+    const live = this.brains.filter((d) => !d.out);
+    const kept = step > 0 && this.aimed && !this.aimed.out && far(this.aimed) <= range ? this.aimed : undefined;
+    const target = kept ?? live[pickTarget(s, this.facing, live.map((d) => d.sprite), { cone: tuning.aimCone, range })];
+    this.aimed = target;
+    if (!target) return swing;
+    this.facing = toward(s, target.sprite, this.facing);
+    return { ...swing, pull: aimPull(far(target) - reach + 2, tuning.aimPull) }; // +2: land just inside
   }
 
   /**
