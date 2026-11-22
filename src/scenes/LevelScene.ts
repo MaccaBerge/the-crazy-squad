@@ -59,6 +59,7 @@ export const tuning = {
   warnRange: 160, // px a dog that's after you warns packmates across, even ones that can't see you
   packRing: 18, // px from you to each hunting dog's spot in the ring (inside their reach, so they can still bite)
   slowmo: 0.3, // world speed during Christian's slow-mo (everything but him)
+  slowmoAttack: 1.6, // and his attacks play this much faster then: a flurry, same damage per hit
   slowmoSpeed: 1.6, // and his own speed and acceleration then, so he looks even faster next to the slowed world
   speedLightning: 0, // 1: lightning off his body and along his trail during slow-mo; 0: afterimages only (testing)
   streak: 0, // 1: the afterimage is one merged shape with a colour and fade gradient; 0: separate copies, ghostGap apart
@@ -327,12 +328,12 @@ export class LevelScene extends Phaser.Scene {
     // Aim help's pull happens in the windup, so you're in reach when the arc opens; the swing's own lunge in its active part.
     // By distance, not time: the swing's clock is a frame ahead of the first move, so a time-spread pull fell short.
     if (sw && sw.pulled < sw.pull && phase === 'windup') {
-      const v = (sw.pull - sw.pulled) / Math.max(dt, sw.def.windup - sw.t);
+      const v = (sw.pull - sw.pulled) / Math.max(dt, (sw.def.windup - sw.t) / this.swingRate());
       sw.pulled += v * dt;
       b.setVelocity(this.facing.x * v, this.facing.y * v);
     }
     if (sw?.def.lunge && phase === 'active')
-      b.setVelocity((this.facing.x * sw.def.lunge) / sw.def.active, (this.facing.y * sw.def.lunge) / sw.def.active);
+      b.setVelocity((this.facing.x * sw.def.lunge * this.swingRate()) / sw.def.active, (this.facing.y * sw.def.lunge * this.swingRate()) / sw.def.active);
 
     if (this.swing) return; // facing is locked from windup to the end of recovery, so a swing can't turn mid-arc
     if (intent.move.x || intent.move.y) {
@@ -353,7 +354,7 @@ export class LevelScene extends Phaser.Scene {
     }
     const sw = this.swing;
     if (!sw) return;
-    sw.t += dt;
+    sw.t += dt * this.swingRate();
     const phase = swingPhase(sw.def, sw.t);
     if (phase === 'done') {
       this.combo = { step: sw.step, since: 0 };
@@ -390,6 +391,11 @@ export class LevelScene extends Phaser.Scene {
     this.facing = toward(s, target.sprite, this.facing);
     this.dir = snapDir(this.dir, this.facing); // the body turns with the attack
     return { ...swing, pull: aimPull(far(target) - reach + 2, tuning.aimPull) }; // +2: land just inside
+  }
+
+  /** How fast swings play: faster in slow-mo, so the speedster's punches speed up with his legs (same damage per hit). */
+  private swingRate() {
+    return this.slowmo ? tuning.slowmoAttack : 1;
   }
 
   /** Whether nothing solid is between the active character and this dog: attacks and aim help don't go through walls. */
