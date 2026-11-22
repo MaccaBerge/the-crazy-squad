@@ -31,6 +31,17 @@ export type Sense = { dist: number | null; visible: boolean; told: boolean; arri
 
 export const newBrain = (): Brain => ({ state: 'idle', t: 0 });
 
+/** s after a stagger ends before the same dog can be staggered again, so mashing can't keep it stunned for good. */
+export const STAGGER_GUARD = 1;
+
+/**
+ * Whether a hit staggers: it has to push (a hit with no knockback never does, even against 0 poise), at least as hard
+ * as the dog's poise, and the dog can't still be guarded from its last stagger (`guard` s left).
+ */
+export function staggers(push: number, poise: number, guard: number) {
+  return push > 0 && push >= poise && guard <= 0;
+}
+
 /**
  * The dog was hit (combat blueprint §6). A hit harder than its poise staggers it, cancelling any windup or attack.
  * Either way a dog that wasn't after you turns on you.

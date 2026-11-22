@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 import { type Dir, snapDir } from '../art/facing';
-import { type Brain, hurt, newBrain, think } from '../ai/dogBrain';
+import { type Brain, hurt, newBrain, STAGGER_GUARD, staggers, think } from '../ai/dogBrain';
 import { type Cell, cellFeet, clearLine, findPath, lineOfSight } from '../ai/path';
 import type { SolidAt } from '../collision/cornerAssist';
 import { Health } from '../collision/hits';
@@ -55,6 +55,7 @@ export class DogAI {
   private knock: Vec = { x: 0, y: 0 };
   private knockT = 0;
   private flashT = 0;
+  private staggerGuard = 0; // s until it can be staggered again (world time)
   /** World speed for this dog: 1 normal, below 1 in slow-mo. Its movement, timers and animation all run this much slower. */
   timeScale = 1;
   /** Seconds since being knocked out, or -1 while still in the fight. */
@@ -90,7 +91,9 @@ export class DogAI {
     this.knock = { x: push.x * w, y: push.y * w };
     this.knockT = KNOCK;
     this.flashT = FLASH;
-    hurt(this.brain, Math.hypot(push.x, push.y) >= this.breed.poise);
+    const staggered = staggers(Math.hypot(push.x, push.y), this.breed.poise, this.staggerGuard);
+    if (staggered) this.staggerGuard = this.breed.brain.stagger + STAGGER_GUARD;
+    hurt(this.brain, staggered);
     if (this.health.down) {
       // shortcut: knocked-out dogs spin and poof in code; run off screen once there's a KO animation.
       this.ko = 0;
@@ -112,6 +115,7 @@ export class DogAI {
     this.flashT = Math.max(0, this.flashT - dt);
     const ts = this.timeScale;
     dt *= ts;
+    this.staggerGuard = Math.max(0, this.staggerGuard - dt);
     if (this.out) return void (this.ko += dt);
     const to = target && { x: target.x - s.x, y: target.y - s.y };
     const dist = to ? Math.hypot(to.x, to.y) : null;

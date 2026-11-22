@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { type BrainDef, hurt, newBrain, type Sense, think } from './dogBrain';
+import { type BrainDef, hurt, newBrain, type Sense, staggers, think } from './dogBrain';
 
 const def: BrainDef = { sight: 100, lose: 150, reach: 20, alert: 0.3, windup: 0.4, attack: 0.1, recover: 0.5, stagger: 0.3, search: 3, lost: 1 };
 
@@ -81,4 +81,11 @@ test('a dog warned by a packmate joins the hunt out of sight, and searches once 
   const { b } = run(undefined, 400, 1, { told: true, visible: false });
   expect(b.state).toBe('chase');
   expect(run(b, 400, 0.05, { visible: false }).entered).toEqual(['search']);
+});
+
+test('a hit staggers only if it pushes, at least as hard as the poise, and not while guarded', () => {
+  expect(staggers(0, 0, 0)).toBe(false); // a punch with no knockback never staggers, even a 0-poise dog
+  expect(staggers(120, 150, 0)).toBe(false);
+  expect(staggers(200, 200, 0)).toBe(true);
+  expect(staggers(200, 200, 0.5)).toBe(false); // still guarded from the last stagger
 });
