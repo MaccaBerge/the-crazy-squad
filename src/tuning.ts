@@ -6,7 +6,7 @@ export function tuningPanel<T extends Record<string, number>>(
   const defaults = { ...values };
   const panel = document.createElement('div');
   panel.style.cssText =
-    'position:fixed;top:8px;right:8px;padding:8px;background:#000c;color:#fff;font:12px monospace;border-radius:4px;display:none';
+    'position:fixed;top:8px;right:8px;box-sizing:border-box;max-height:calc(100vh - 16px);overflow-y:auto;overscroll-behavior:contain;padding:8px;background:#000c;color:#fff;font:12px monospace;border-radius:4px;display:none';
 
   const rows: (() => void)[] = [];
   for (const key of Object.keys(ranges) as (keyof T & string)[]) {
