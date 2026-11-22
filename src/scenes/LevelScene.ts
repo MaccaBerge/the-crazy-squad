@@ -273,7 +273,7 @@ export class LevelScene extends Phaser.Scene {
     const intent = this.controller.getIntent(performance.now());
     // Only drain while actually moving: holding Shift against a wall shouldn't tire you out.
     const moving = !!(intent.move.x || intent.move.y) && this.active.body.velocity.length() > 5;
-    this.sprinting = this.party.tick(dt, intent.sprint && moving);
+    this.sprinting = this.party.tick(dt, intent.sprint && moving && !this.swing); // attacking you only creep: no sprint drain
     const swap = SWAP_ACTIONS.find((a) => intent.pressed.has(a));
     if (swap) this.trySwap(swap);
     const ability = this.party.abilities[this.party.activeIndex];
@@ -412,8 +412,8 @@ export class LevelScene extends Phaser.Scene {
     this.slowmo = true;
     this.freeze(80);
     const cam = this.cameras.main;
+    if (!this.tweens.isTweening(cam)) this.baseZoom = cam.zoom; // mid zoom-out, keep the old base so the zoom can't creep
     this.tweens.killTweensOf(cam);
-    this.baseZoom = cam.zoom;
     this.tweens.add({ targets: cam, zoom: this.baseZoom * SLOWMO.zoom, duration: 250, ease: 'Cubic.Out' });
     this.shockwave(this.active, 1);
   }
