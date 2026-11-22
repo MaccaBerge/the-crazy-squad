@@ -46,7 +46,7 @@ export class SpeedFx {
    * Per rendered frame. `k` is how strong slow-mo is right now (0 off, 1 full). `bolts` off: afterimages carry the look,
    * either as one merged `streak`, or as copies one every `gap` px (~10+ separate figures, ~2 blended).
    */
-  update(now: number, s: Sprite, k: number, { bolts = true, gap = 2, streak = false } = {}) {
+  update(now: number, s: Sprite, k: number, { bolts = true, gap = 2, streak = false, rings = true } = {}) {
     this.drawStreak(now, s, k, !bolts && streak);
     const glow = this.glow.clear(), core = this.core.clear();
     if (k <= 0) {
@@ -59,7 +59,7 @@ export class SpeedFx {
     const back = moving ? { x: -v.x / speed, y: -v.y / speed } : { x: 0, y: 0 };
 
     // Warm light round him, flickering with the electricity.
-    this.light.setVisible(true).setPosition(chest.x, chest.y).setAlpha(k * (0.5 + 0.12 * Math.sin(now / 45) + Math.random() * 0.1));
+    this.light.setVisible(rings).setPosition(chest.x, chest.y).setAlpha(k * (0.5 + 0.12 * Math.sin(now / 45) + Math.random() * 0.1));
 
     // Trail: live strands of lightning along where he just ran, re-jagged every frame so they writhe, fading behind.
     if (!bolts) (this.trail = []), (this.arcs = []);
