@@ -26,11 +26,16 @@ export function swingPhase(s: Swing, t: number): SwingPhase {
   return t < s.windup + s.active + s.recovery ? 'recovery' : 'done';
 }
 
-/** Whether `to` is inside the arc swung from `from` towards the unit vector `facing`. */
-export function inArc(s: Swing, from: Vec, facing: Vec, to: Vec) {
+/**
+ * Whether a body centred on `to`, `pad` px round (half its width), is touched by the arc swung from `from` towards the
+ * unit vector `facing`: the reach counts to the body's edge, and the arc widens by the angle the body takes up.
+ */
+export function inArc(s: Swing, from: Vec, facing: Vec, to: Vec, pad = 0) {
   const dx = to.x - from.x, dy = to.y - from.y, d = Math.hypot(dx, dy);
-  if (d > s.radius) return false;
-  return d < 1e-6 || (dx * facing.x + dy * facing.y) / d >= Math.cos(((s.arc / 2) * Math.PI) / 180);
+  if (d > s.radius + pad) return false;
+  if (d <= Math.max(pad, 1e-6)) return true; // touching
+  const half = ((s.arc / 2) * Math.PI) / 180 + Math.asin(Math.min(1, pad / d));
+  return (dx * facing.x + dy * facing.y) / d >= Math.cos(Math.min(Math.PI, half));
 }
 
 /** s after a combo step ends that another press continues to the next step (combat blueprint §3). */
